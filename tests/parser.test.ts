@@ -12,7 +12,10 @@ const html = `
     <td>07/08/2026</td><td>22349</td><td>24451</td><td>Diário Oficial do Estado da Bahia</td>
     <td>Não</td><td>80</td><td>453</td><td>0</td><td>96</td><td>Sim</td>
     <td>07/08/2026 00:11:29</td>
-    <td><a title="Visualizar Edição" href="/admin/edicoes/view/22349">ver</a></td>
+    <td>
+      <a title="Editar" href="/admin/edicoes/edit/22349">editar</a>
+      <a title="Visualizar Edição" href="/admin/edicoes/view/22349">ver</a>
+    </td>
   </tr></tbody>
 </table>
 <div class="paging_bootstrap pagination"><ul><li class="next"><a href="/admin/edicoes/index/page:2">›</a></li></ul></div>`;
@@ -24,7 +27,7 @@ describe('parser EGBANET', () => {
     expect(parseBrDateTime('')).toBeNull();
   });
 
-  it('resolve colunas pelo cabeçalho, não pela posição', () => {
+  it('resolve colunas pelo cabeçalho e extrai links de ação relevantes', () => {
     const result = parseEditionPage(html, 1);
     expect(result.editions).toHaveLength(1);
     expect(result.editions[0]).toMatchObject({
@@ -39,9 +42,15 @@ describe('parser EGBANET', () => {
       downloads: 96,
       publicadaInternet: true,
       dataPublicacao: '2026-08-07T00:11:29',
+      editUrl: '/admin/edicoes/edit/22349',
       viewUrl: '/admin/edicoes/view/22349',
       paginaOrigem: 1
     });
+  });
+
+  it('usa o padrão conhecido como fallback quando o link Editar não está presente', () => {
+    const withoutEdit = html.replace('<a title="Editar" href="/admin/edicoes/edit/22349">editar</a>', '');
+    expect(parseEditionPage(withoutEdit, 1).editions[0].editUrl).toBe('/admin/edicoes/edit/22349');
   });
 
   it('aceita somente o padrão conhecido da próxima página', () => {

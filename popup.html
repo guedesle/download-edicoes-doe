@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Download de Edições DOE</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <span class="eyebrow">EGBANET</span>
+          <h1>Inventário de edições</h1>
+        </div>
+        <span id="statusBadge" class="status-badge">Pronto</span>
+      </header>
+
+      <section class="summary-grid" aria-label="Resumo do inventário">
+        <article class="summary-card">
+          <span class="summary-label">Edições locais</span>
+          <strong id="totalEditions">0</strong>
+        </article>
+        <article class="summary-card">
+          <span class="summary-label">Páginas lidas</span>
+          <strong id="pagesProcessed">0</strong>
+        </article>
+      </section>
+
+      <section id="progressPanel" class="progress-panel" aria-live="polite">
+        <div class="progress-track" aria-hidden="true"><div id="progressBar" class="progress-bar"></div></div>
+        <p id="progressText">Nenhuma sincronização em andamento.</p>
+      </section>
+
+      <section class="details">
+        <div><span>Última sincronização</span><strong id="lastSync">—</strong></div>
+        <div><span>Novas</span><strong id="insertedCount">0</strong></div>
+        <div><span>Atualizadas</span><strong id="updatedCount">0</strong></div>
+      </section>
+
+      <p id="errorBox" class="error-box" hidden></p>
+
+      <footer class="actions">
+        <button id="syncButton" class="primary-button" type="button">Sincronizar edições</button>
+        <button id="cancelButton" class="secondary-button" type="button" hidden>Cancelar</button>
+      </footer>
+    </main>
+    <script type="module" src="/src/popup.ts"></script>
+  </body>
+</html>

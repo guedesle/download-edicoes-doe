@@ -12,6 +12,7 @@ export interface EditionRecord {
   downloads: number | null;
   publicadaInternet: boolean | null;
   dataPublicacao: string | null;
+  editUrl: string;
   viewUrl: string;
   paginaOrigem: number;
 }

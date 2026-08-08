@@ -80,7 +80,7 @@ Principais tabelas:
 - `edicoes`: inventário consolidado dos registros de edição;
 - `sincronizacoes`: histórico de execuções, contagens, estado e erro final quando houver.
 
-O schema atual é a versão 3. A migração automática preserva o banco já coletado, remove a restrição editorial `UNIQUE` das versões iniciais e acrescenta `edit_url`. Para registros existentes, o link é preenchido automaticamente a partir de `egbanet_id`; sincronizações seguintes atualizam o valor usando o `href` real encontrado no HTML.
+O schema atual é a versão 3. Qualquer banco de uma versão anterior é migrado automaticamente em uma transação: os registros coletados são preservados, a restrição editorial `UNIQUE` das versões iniciais é removida e `edit_url` é acrescentado. Para registros já existentes, `edit_url` é preenchido a partir de `egbanet_id`; sincronizações seguintes substituem esse valor pelo `href` efetivamente encontrado no HTML.
 
 Campos vazios do EGBANET são armazenados como `NULL`. Datas editoriais são normalizadas para ISO (`YYYY-MM-DD`) e data/hora de publicação para `YYYY-MM-DDTHH:mm:ss`, sem inferência de fuso horário.
 

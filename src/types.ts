@@ -56,6 +56,8 @@ export interface DownloadCaptureStatus {
   processed: number;
   signedFound: number;
   diaryFound: number;
+  signedSizesFound: number;
+  diarySizesFound: number;
   failures: number;
   capturedEditions: number;
   currentEditionId?: number;
@@ -67,6 +69,8 @@ export interface DownloadCaptureStats {
   capturedEditions: number;
   signedLinks: number;
   diaryLinks: number;
+  signedSizes: number;
+  diarySizes: number;
 }
 
 export interface DbResponse<T = unknown> {

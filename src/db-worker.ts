@@ -6,7 +6,6 @@ const DB_NAME = '/download-edicoes-doe.sqlite3';
 let dbPromise: Promise<any> | null = null;
 
 const SCHEMA = `
-PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
 
 CREATE TABLE IF NOT EXISTS edicoes (
@@ -150,7 +149,7 @@ async function upsertBatch(editions: EditionRecord[]): Promise<{ inserted: numbe
 async function updateSync(syncId: number, values: Record<string, number>): Promise<void> {
   const db = await getDb();
   db.exec({
-    sql: `UPDATE sincronizacoes SET paginas_processadas=?, registros_encontrados=?, registros_inseridos=?, registros_atualizados=? WHERE id=?`,
+    sql: 'UPDATE sincronizacoes SET paginas_processadas=?, registros_encontrados=?, registros_inseridos=?, registros_atualizados=? WHERE id=?',
     bind: [values.pagesProcessed, values.editionsSeen, values.inserted, values.updated, syncId]
   });
 }

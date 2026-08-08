@@ -3,11 +3,10 @@ import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import type { EditionRecord, DbResponse } from './types';
 
 const DB_NAME = '/download-edicoes-doe.sqlite3';
+const SCHEMA_VERSION = 2;
 let dbPromise: Promise<any> | null = null;
 
-const SCHEMA = `
-PRAGMA foreign_keys=ON;
-
+const EDITIONS_TABLE = `
 CREATE TABLE IF NOT EXISTS edicoes (
   egbanet_id INTEGER PRIMARY KEY,
   tipo_edicao TEXT NOT NULL,
@@ -23,14 +22,19 @@ CREATE TABLE IF NOT EXISTS edicoes (
   view_url TEXT NOT NULL,
   pagina_origem INTEGER NOT NULL,
   primeira_coleta_em TEXT NOT NULL,
-  ultima_coleta_em TEXT NOT NULL,
-  UNIQUE (tipo_edicao, data_edicao, numero_edicao)
+  ultima_coleta_em TEXT NOT NULL
 );
+`;
 
+const EDITIONS_INDEXES = `
 CREATE INDEX IF NOT EXISTS idx_edicoes_data ON edicoes(data_edicao DESC);
 CREATE INDEX IF NOT EXISTS idx_edicoes_numero ON edicoes(numero_edicao DESC);
 CREATE INDEX IF NOT EXISTS idx_edicoes_tipo ON edicoes(tipo_edicao);
+CREATE INDEX IF NOT EXISTS idx_edicoes_identidade_editorial
+  ON edicoes(tipo_edicao, data_edicao, numero_edicao);
+`;
 
+const SYNC_TABLE = `
 CREATE TABLE IF NOT EXISTS sincronizacoes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   iniciada_em TEXT NOT NULL,
@@ -44,6 +48,65 @@ CREATE TABLE IF NOT EXISTS sincronizacoes (
 );
 `;
 
+function tableExists(db: any, name: string): boolean {
+  return Number(db.selectValue(
+    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
+    [name]
+  )) > 0;
+}
+
+function migrateV1ToV2(db: any): void {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.exec(`
+      DROP INDEX IF EXISTS idx_edicoes_data;
+      DROP INDEX IF EXISTS idx_edicoes_numero;
+      DROP INDEX IF EXISTS idx_edicoes_tipo;
+      DROP INDEX IF EXISTS idx_edicoes_identidade_editorial;
+
+      ALTER TABLE edicoes RENAME TO edicoes_v1;
+
+      ${EDITIONS_TABLE}
+
+      INSERT INTO edicoes (
+        egbanet_id, tipo_edicao, data_edicao, numero_edicao, suplemento,
+        numero_paginas, materias, materias_pendentes, downloads, publicada_internet,
+        data_publicacao, view_url, pagina_origem, primeira_coleta_em, ultima_coleta_em
+      )
+      SELECT
+        egbanet_id, tipo_edicao, data_edicao, numero_edicao, suplemento,
+        numero_paginas, materias, materias_pendentes, downloads, publicada_internet,
+        data_publicacao, view_url, pagina_origem, primeira_coleta_em, ultima_coleta_em
+      FROM edicoes_v1;
+
+      DROP TABLE edicoes_v1;
+      ${EDITIONS_INDEXES}
+      PRAGMA user_version=${SCHEMA_VERSION};
+    `);
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
+
+function initializeSchema(db: any): void {
+  db.exec('PRAGMA foreign_keys=ON;');
+
+  const hasEditions = tableExists(db, 'edicoes');
+  if (!hasEditions) {
+    db.exec(`${EDITIONS_TABLE}${EDITIONS_INDEXES}${SYNC_TABLE}PRAGMA user_version=${SCHEMA_VERSION};`);
+    return;
+  }
+
+  const version = Number(db.selectValue('PRAGMA user_version'));
+  if (version < SCHEMA_VERSION) {
+    migrateV1ToV2(db);
+  }
+
+  db.exec(`${EDITIONS_INDEXES}${SYNC_TABLE}`);
+}
+
 async function getDb(): Promise<any> {
   if (!dbPromise) {
     dbPromise = (async () => {
@@ -56,7 +119,7 @@ async function getDb(): Promise<any> {
         throw new Error('SQLite OPFS não está disponível neste navegador.');
       }
       const db = new sqlite3.oo1.OpfsDb(DB_NAME, 'c');
-      db.exec(SCHEMA);
+      initializeSchema(db);
       return db;
     })();
   }

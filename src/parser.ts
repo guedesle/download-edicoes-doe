@@ -96,11 +96,18 @@ function parseRow(row: Element, headers: Map<string, number>, pageNumber: number
   };
 }
 
-function resolveCurrentVersionRow(table: HTMLTableElement): HTMLTableRowElement {
+function resolveCurrentVersionRow(
+  table: HTMLTableElement,
+  headers: Map<string, number>
+): HTMLTableRowElement {
+  if (!headers.has('versao numero')) {
+    throw new Error('A tabela de versões não possui a coluna Versão Número.');
+  }
+
   const rows = [...table.querySelectorAll<HTMLTableRowElement>('tbody > tr')];
   const current = rows.find((row) => {
-    const firstCell = row.querySelector(':scope > td');
-    return normalize(text(firstCell ?? undefined)).includes('versao atual');
+    const cells = [...row.querySelectorAll(':scope > td')];
+    return normalize(text(cell(cells, headers, 'Versão Número'))).includes('versao atual');
   });
 
   if (!current) {
@@ -129,7 +136,7 @@ export function parseEditionDownloadLinks(html: string, egbanetId: number): Edit
     throw new Error(`Colunas de download esperadas não foram encontradas na edição ${egbanetId}.`);
   }
 
-  const currentRow = resolveCurrentVersionRow(table);
+  const currentRow = resolveCurrentVersionRow(table, headers);
   const cells = [...currentRow.querySelectorAll(':scope > td')];
   const signedHref = cell(cells, headers, 'Download Assinado')?.querySelector<HTMLAnchorElement>('a[href]')?.getAttribute('href') ?? null;
   const diaryHref = cell(cells, headers, 'Normal')?.querySelector<HTMLAnchorElement>('a[href]')?.getAttribute('href') ?? null;

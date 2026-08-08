@@ -3,13 +3,11 @@ import type { DbResponse, SyncStatus } from './types';
 
 const EGBANET_ORIGIN = 'https://egbanet.egba.ba.gov.br';
 const FIRST_PAGE = `${EGBANET_ORIGIN}/admin/edicoes`;
-const STATUS_KEY = 'inventorySyncStatus';
 const REQUEST_DELAY_MS = 120;
 
 class DbClient {
   private worker = new Worker(new URL('./db-worker.ts', import.meta.url), { type: 'module' });
   private pending = new Map<string, { resolve: (value: any) => void; reject: (reason: Error) => void }>();
-  private fatalError: Error | null = null;
 
   constructor() {
     this.worker.addEventListener('message', (event: MessageEvent<DbResponse>) => {
@@ -21,24 +19,14 @@ class DbClient {
       else request.reject(new Error(response.error ?? 'Falha no SQLite.'));
     });
 
-    this.worker.addEventListener('error', (event: ErrorEvent) => {
-      this.fail(new Error(`Falha ao iniciar o worker SQLite: ${event.message || 'erro desconhecido'}`));
+    this.worker.addEventListener('error', (event) => {
+      const error = new Error(event.message || 'Falha ao inicializar o worker SQLite.');
+      for (const request of this.pending.values()) request.reject(error);
+      this.pending.clear();
     });
-
-    this.worker.addEventListener('messageerror', () => {
-      this.fail(new Error('Falha de comunicação com o worker SQLite.'));
-    });
-  }
-
-  private fail(error: Error): void {
-    this.fatalError = error;
-    for (const request of this.pending.values()) request.reject(error);
-    this.pending.clear();
   }
 
   call<T>(action: string, payload: unknown = {}): Promise<T> {
-    if (this.fatalError) return Promise.reject(this.fatalError);
-
     const requestId = crypto.randomUUID();
     return new Promise<T>((resolve, reject) => {
       this.pending.set(requestId, { resolve, reject });
@@ -57,7 +45,15 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function publish(status: SyncStatus): Promise<void> {
-  await chrome.storage.local.set({ [STATUS_KEY]: status });
+  const result = await chrome.runtime.sendMessage({
+    target: 'service-worker',
+    type: 'STATUS_UPDATE',
+    status
+  });
+
+  if (result?.ok === false) {
+    throw new Error(result.reason ?? 'Não foi possível persistir o status da sincronização.');
+  }
 }
 
 function isAuthenticationFailure(response: Response, html: string): boolean {
@@ -104,8 +100,6 @@ async function crawl(): Promise<void> {
   let syncId: number | null = null;
 
   try {
-    // Publica o estado antes de inicializar o SQLite. Assim, qualquer falha de
-    // bootstrap do WASM/OPFS aparece para o usuário em vez de parecer um clique sem efeito.
     await publish(status);
     syncId = await db.call<number>('beginSync', { startedAt });
 
@@ -183,7 +177,7 @@ async function crawl(): Promise<void> {
         error: status.error
       }).catch(() => undefined);
     }
-    await publish(status);
+    await publish(status).catch(() => undefined);
   } finally {
     activeRequest = null;
     running = false;

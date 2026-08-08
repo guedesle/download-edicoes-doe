@@ -1,9 +1,15 @@
 /// <reference lib="webworker" />
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
-import type { EditionRecord, DbResponse } from './types';
+import type {
+  DbResponse,
+  DownloadCaptureMode,
+  DownloadCaptureStats,
+  DownloadCaptureTarget,
+  EditionRecord
+} from './types';
 
 const DB_NAME = '/download-edicoes-doe.sqlite3';
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 let dbPromise: Promise<any> | null = null;
 
 const EDITIONS_TABLE = `
@@ -21,6 +27,9 @@ CREATE TABLE IF NOT EXISTS edicoes (
   data_publicacao TEXT,
   edit_url TEXT NOT NULL,
   view_url TEXT NOT NULL,
+  download_assinado_url TEXT,
+  download_diario_url TEXT,
+  download_links_capturados_em TEXT,
   pagina_origem INTEGER NOT NULL,
   primeira_coleta_em TEXT NOT NULL,
   ultima_coleta_em TEXT NOT NULL
@@ -33,6 +42,8 @@ CREATE INDEX IF NOT EXISTS idx_edicoes_numero ON edicoes(numero_edicao DESC);
 CREATE INDEX IF NOT EXISTS idx_edicoes_tipo ON edicoes(tipo_edicao);
 CREATE INDEX IF NOT EXISTS idx_edicoes_identidade_editorial
   ON edicoes(tipo_edicao, data_edicao, numero_edicao);
+CREATE INDEX IF NOT EXISTS idx_edicoes_download_capture
+  ON edicoes(download_links_capturados_em);
 `;
 
 const SYNC_TABLE = `
@@ -55,7 +66,7 @@ function editionsTableExists(db: any): boolean {
   )) > 0;
 }
 
-function migrateLegacyToV3(db: any): void {
+function migrateLegacyToV4(db: any): void {
   db.exec('BEGIN IMMEDIATE');
   try {
     db.exec(`
@@ -63,6 +74,7 @@ function migrateLegacyToV3(db: any): void {
       DROP INDEX IF EXISTS idx_edicoes_numero;
       DROP INDEX IF EXISTS idx_edicoes_tipo;
       DROP INDEX IF EXISTS idx_edicoes_identidade_editorial;
+      DROP INDEX IF EXISTS idx_edicoes_download_capture;
 
       ALTER TABLE edicoes RENAME TO edicoes_legacy;
 
@@ -71,17 +83,38 @@ function migrateLegacyToV3(db: any): void {
       INSERT INTO edicoes (
         egbanet_id, tipo_edicao, data_edicao, numero_edicao, suplemento,
         numero_paginas, materias, materias_pendentes, downloads, publicada_internet,
-        data_publicacao, edit_url, view_url, pagina_origem, primeira_coleta_em, ultima_coleta_em
+        data_publicacao, edit_url, view_url,
+        download_assinado_url, download_diario_url, download_links_capturados_em,
+        pagina_origem, primeira_coleta_em, ultima_coleta_em
       )
       SELECT
         egbanet_id, tipo_edicao, data_edicao, numero_edicao, suplemento,
         numero_paginas, materias, materias_pendentes, downloads, publicada_internet,
         data_publicacao,
         '/admin/edicoes/edit/' || egbanet_id,
-        view_url, pagina_origem, primeira_coleta_em, ultima_coleta_em
+        view_url,
+        NULL, NULL, NULL,
+        pagina_origem, primeira_coleta_em, ultima_coleta_em
       FROM edicoes_legacy;
 
       DROP TABLE edicoes_legacy;
+      ${EDITIONS_INDEXES}
+      PRAGMA user_version=${SCHEMA_VERSION};
+    `);
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
+
+function migrateV3ToV4(db: any): void {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.exec(`
+      ALTER TABLE edicoes ADD COLUMN download_assinado_url TEXT;
+      ALTER TABLE edicoes ADD COLUMN download_diario_url TEXT;
+      ALTER TABLE edicoes ADD COLUMN download_links_capturados_em TEXT;
       ${EDITIONS_INDEXES}
       PRAGMA user_version=${SCHEMA_VERSION};
     `);
@@ -101,8 +134,10 @@ function initializeSchema(db: any): void {
   }
 
   const version = Number(db.selectValue('PRAGMA user_version'));
-  if (version < SCHEMA_VERSION) {
-    migrateLegacyToV3(db);
+  if (version < 3) {
+    migrateLegacyToV4(db);
+  } else if (version < SCHEMA_VERSION) {
+    migrateV3ToV4(db);
   }
 
   db.exec(`${EDITIONS_INDEXES}${SYNC_TABLE}`);
@@ -232,6 +267,53 @@ async function finishSync(syncId: number, status: string, finishedAt: string, er
   });
 }
 
+async function downloadCaptureStats(): Promise<DownloadCaptureStats> {
+  const db = await getDb();
+  return {
+    totalEditions: Number(db.selectValue('SELECT COUNT(*) FROM edicoes')),
+    capturedEditions: Number(db.selectValue('SELECT COUNT(*) FROM edicoes WHERE download_links_capturados_em IS NOT NULL')),
+    signedLinks: Number(db.selectValue('SELECT COUNT(*) FROM edicoes WHERE download_assinado_url IS NOT NULL')),
+    diaryLinks: Number(db.selectValue('SELECT COUNT(*) FROM edicoes WHERE download_diario_url IS NOT NULL'))
+  };
+}
+
+async function listDownloadCaptureTargets(mode: DownloadCaptureMode): Promise<DownloadCaptureTarget[]> {
+  const db = await getDb();
+  const targets: DownloadCaptureTarget[] = [];
+  const where = mode === 'all' ? '' : 'WHERE download_links_capturados_em IS NULL';
+  db.exec({
+    sql: `SELECT egbanet_id, edit_url FROM edicoes ${where} ORDER BY data_edicao DESC, egbanet_id DESC`,
+    rowMode: 'array',
+    callback: (row: unknown[]) => targets.push({
+      egbanetId: Number(row[0]),
+      editUrl: String(row[1])
+    })
+  });
+  return targets;
+}
+
+async function saveDownloadLinks(payload: {
+  egbanetId: number;
+  downloadAssinadoUrl: string | null;
+  downloadDiarioUrl: string | null;
+  capturedAt: string;
+}): Promise<void> {
+  const db = await getDb();
+  db.exec({
+    sql: `
+      UPDATE edicoes
+      SET download_assinado_url=?, download_diario_url=?, download_links_capturados_em=?
+      WHERE egbanet_id=?
+    `,
+    bind: [
+      payload.downloadAssinadoUrl,
+      payload.downloadDiarioUrl,
+      payload.capturedAt,
+      payload.egbanetId
+    ]
+  });
+}
+
 async function handle(action: string, payload: any): Promise<unknown> {
   switch (action) {
     case 'beginSync': return beginSync(payload.startedAt);
@@ -242,6 +324,9 @@ async function handle(action: string, payload: any): Promise<unknown> {
       const db = await getDb();
       return { total: Number(db.selectValue('SELECT COUNT(*) FROM edicoes')) };
     }
+    case 'downloadCaptureStats': return downloadCaptureStats();
+    case 'listDownloadCaptureTargets': return listDownloadCaptureTargets(payload.mode);
+    case 'saveDownloadLinks': return saveDownloadLinks(payload);
     default: throw new Error(`Ação SQLite desconhecida: ${action}`);
   }
 }

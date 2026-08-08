@@ -3,7 +3,7 @@ import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import type { EditionRecord, DbResponse } from './types';
 
 const DB_NAME = '/download-edicoes-doe.sqlite3';
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 let dbPromise: Promise<any> | null = null;
 
 const EDITIONS_TABLE = `
@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS edicoes (
   downloads INTEGER,
   publicada_internet INTEGER,
   data_publicacao TEXT,
+  edit_url TEXT NOT NULL,
   view_url TEXT NOT NULL,
   pagina_origem INTEGER NOT NULL,
   primeira_coleta_em TEXT NOT NULL,
@@ -48,14 +49,13 @@ CREATE TABLE IF NOT EXISTS sincronizacoes (
 );
 `;
 
-function tableExists(db: any, name: string): boolean {
+function editionsTableExists(db: any): boolean {
   return Number(db.selectValue(
-    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?",
-    [name]
+    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='edicoes'"
   )) > 0;
 }
 
-function migrateV1ToV2(db: any): void {
+function migrateLegacyToV3(db: any): void {
   db.exec('BEGIN IMMEDIATE');
   try {
     db.exec(`
@@ -64,22 +64,24 @@ function migrateV1ToV2(db: any): void {
       DROP INDEX IF EXISTS idx_edicoes_tipo;
       DROP INDEX IF EXISTS idx_edicoes_identidade_editorial;
 
-      ALTER TABLE edicoes RENAME TO edicoes_v1;
+      ALTER TABLE edicoes RENAME TO edicoes_legacy;
 
       ${EDITIONS_TABLE}
 
       INSERT INTO edicoes (
         egbanet_id, tipo_edicao, data_edicao, numero_edicao, suplemento,
         numero_paginas, materias, materias_pendentes, downloads, publicada_internet,
-        data_publicacao, view_url, pagina_origem, primeira_coleta_em, ultima_coleta_em
+        data_publicacao, edit_url, view_url, pagina_origem, primeira_coleta_em, ultima_coleta_em
       )
       SELECT
         egbanet_id, tipo_edicao, data_edicao, numero_edicao, suplemento,
         numero_paginas, materias, materias_pendentes, downloads, publicada_internet,
-        data_publicacao, view_url, pagina_origem, primeira_coleta_em, ultima_coleta_em
-      FROM edicoes_v1;
+        data_publicacao,
+        '/admin/edicoes/edit/' || egbanet_id,
+        view_url, pagina_origem, primeira_coleta_em, ultima_coleta_em
+      FROM edicoes_legacy;
 
-      DROP TABLE edicoes_v1;
+      DROP TABLE edicoes_legacy;
       ${EDITIONS_INDEXES}
       PRAGMA user_version=${SCHEMA_VERSION};
     `);
@@ -93,15 +95,14 @@ function migrateV1ToV2(db: any): void {
 function initializeSchema(db: any): void {
   db.exec('PRAGMA foreign_keys=ON;');
 
-  const hasEditions = tableExists(db, 'edicoes');
-  if (!hasEditions) {
+  if (!editionsTableExists(db)) {
     db.exec(`${EDITIONS_TABLE}${EDITIONS_INDEXES}${SYNC_TABLE}PRAGMA user_version=${SCHEMA_VERSION};`);
     return;
   }
 
   const version = Number(db.selectValue('PRAGMA user_version'));
   if (version < SCHEMA_VERSION) {
-    migrateV1ToV2(db);
+    migrateLegacyToV3(db);
   }
 
   db.exec(`${EDITIONS_INDEXES}${SYNC_TABLE}`);
@@ -159,8 +160,8 @@ async function upsertBatch(editions: EditionRecord[]): Promise<{ inserted: numbe
     INSERT INTO edicoes (
       egbanet_id, tipo_edicao, data_edicao, numero_edicao, suplemento,
       numero_paginas, materias, materias_pendentes, downloads, publicada_internet,
-      data_publicacao, view_url, pagina_origem, primeira_coleta_em, ultima_coleta_em
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      data_publicacao, edit_url, view_url, pagina_origem, primeira_coleta_em, ultima_coleta_em
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(egbanet_id) DO UPDATE SET
       tipo_edicao=excluded.tipo_edicao,
       data_edicao=excluded.data_edicao,
@@ -172,6 +173,7 @@ async function upsertBatch(editions: EditionRecord[]): Promise<{ inserted: numbe
       downloads=excluded.downloads,
       publicada_internet=excluded.publicada_internet,
       data_publicacao=excluded.data_publicacao,
+      edit_url=excluded.edit_url,
       view_url=excluded.view_url,
       pagina_origem=excluded.pagina_origem,
       ultima_coleta_em=excluded.ultima_coleta_em
@@ -194,6 +196,7 @@ async function upsertBatch(editions: EditionRecord[]): Promise<{ inserted: numbe
           edition.downloads,
           bool(edition.publicadaInternet),
           edition.dataPublicacao,
+          edition.editUrl,
           edition.viewUrl,
           edition.paginaOrigem,
           now,

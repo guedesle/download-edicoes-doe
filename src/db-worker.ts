@@ -9,7 +9,7 @@ import type {
 } from './types';
 
 const DB_NAME = '/download-edicoes-doe.sqlite3';
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 let dbPromise: Promise<any> | null = null;
 
 const EDITIONS_TABLE = `
@@ -28,7 +28,9 @@ CREATE TABLE IF NOT EXISTS edicoes (
   edit_url TEXT NOT NULL,
   view_url TEXT NOT NULL,
   download_assinado_url TEXT,
+  download_assinado_bytes INTEGER,
   download_diario_url TEXT,
+  download_diario_bytes INTEGER,
   download_links_capturados_em TEXT,
   pagina_origem INTEGER NOT NULL,
   primeira_coleta_em TEXT NOT NULL,
@@ -66,7 +68,7 @@ function editionsTableExists(db: any): boolean {
   )) > 0;
 }
 
-function migrateLegacyToV4(db: any): void {
+function migrateLegacyToV5(db: any): void {
   db.exec('BEGIN IMMEDIATE');
   try {
     db.exec(`
@@ -84,7 +86,8 @@ function migrateLegacyToV4(db: any): void {
         egbanet_id, tipo_edicao, data_edicao, numero_edicao, suplemento,
         numero_paginas, materias, materias_pendentes, downloads, publicada_internet,
         data_publicacao, edit_url, view_url,
-        download_assinado_url, download_diario_url, download_links_capturados_em,
+        download_assinado_url, download_assinado_bytes,
+        download_diario_url, download_diario_bytes, download_links_capturados_em,
         pagina_origem, primeira_coleta_em, ultima_coleta_em
       )
       SELECT
@@ -93,7 +96,7 @@ function migrateLegacyToV4(db: any): void {
         data_publicacao,
         '/admin/edicoes/edit/' || egbanet_id,
         view_url,
-        NULL, NULL, NULL,
+        NULL, NULL, NULL, NULL, NULL,
         pagina_origem, primeira_coleta_em, ultima_coleta_em
       FROM edicoes_legacy;
 
@@ -108,13 +111,31 @@ function migrateLegacyToV4(db: any): void {
   }
 }
 
-function migrateV3ToV4(db: any): void {
+function migrateV3ToV5(db: any): void {
   db.exec('BEGIN IMMEDIATE');
   try {
     db.exec(`
       ALTER TABLE edicoes ADD COLUMN download_assinado_url TEXT;
+      ALTER TABLE edicoes ADD COLUMN download_assinado_bytes INTEGER;
       ALTER TABLE edicoes ADD COLUMN download_diario_url TEXT;
+      ALTER TABLE edicoes ADD COLUMN download_diario_bytes INTEGER;
       ALTER TABLE edicoes ADD COLUMN download_links_capturados_em TEXT;
+      ${EDITIONS_INDEXES}
+      PRAGMA user_version=${SCHEMA_VERSION};
+    `);
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+}
+
+function migrateV4ToV5(db: any): void {
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.exec(`
+      ALTER TABLE edicoes ADD COLUMN download_assinado_bytes INTEGER;
+      ALTER TABLE edicoes ADD COLUMN download_diario_bytes INTEGER;
       ${EDITIONS_INDEXES}
       PRAGMA user_version=${SCHEMA_VERSION};
     `);
@@ -135,9 +156,11 @@ function initializeSchema(db: any): void {
 
   const version = Number(db.selectValue('PRAGMA user_version'));
   if (version < 3) {
-    migrateLegacyToV4(db);
-  } else if (version < SCHEMA_VERSION) {
-    migrateV3ToV4(db);
+    migrateLegacyToV5(db);
+  } else if (version === 3) {
+    migrateV3ToV5(db);
+  } else if (version === 4) {
+    migrateV4ToV5(db);
   }
 
   db.exec(`${EDITIONS_INDEXES}${SYNC_TABLE}`);
@@ -273,7 +296,9 @@ async function downloadCaptureStats(): Promise<DownloadCaptureStats> {
     totalEditions: Number(db.selectValue('SELECT COUNT(*) FROM edicoes')),
     capturedEditions: Number(db.selectValue('SELECT COUNT(*) FROM edicoes WHERE download_links_capturados_em IS NOT NULL')),
     signedLinks: Number(db.selectValue('SELECT COUNT(*) FROM edicoes WHERE download_assinado_url IS NOT NULL')),
-    diaryLinks: Number(db.selectValue('SELECT COUNT(*) FROM edicoes WHERE download_diario_url IS NOT NULL'))
+    diaryLinks: Number(db.selectValue('SELECT COUNT(*) FROM edicoes WHERE download_diario_url IS NOT NULL')),
+    signedSizes: Number(db.selectValue('SELECT COUNT(*) FROM edicoes WHERE download_assinado_bytes IS NOT NULL')),
+    diarySizes: Number(db.selectValue('SELECT COUNT(*) FROM edicoes WHERE download_diario_bytes IS NOT NULL'))
   };
 }
 
@@ -295,19 +320,24 @@ async function listDownloadCaptureTargets(mode: DownloadCaptureMode): Promise<Do
 async function saveDownloadLinks(payload: {
   egbanetId: number;
   downloadAssinadoUrl: string | null;
+  downloadAssinadoBytes: number | null;
   downloadDiarioUrl: string | null;
+  downloadDiarioBytes: number | null;
   capturedAt: string;
 }): Promise<void> {
   const db = await getDb();
   db.exec({
     sql: `
       UPDATE edicoes
-      SET download_assinado_url=?, download_diario_url=?, download_links_capturados_em=?
+      SET download_assinado_url=?, download_assinado_bytes=?,
+          download_diario_url=?, download_diario_bytes=?, download_links_capturados_em=?
       WHERE egbanet_id=?
     `,
     bind: [
       payload.downloadAssinadoUrl,
+      payload.downloadAssinadoBytes,
       payload.downloadDiarioUrl,
+      payload.downloadDiarioBytes,
       payload.capturedAt,
       payload.egbanetId
     ]

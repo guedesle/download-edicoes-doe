@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS sincronizacoes (
 async function getDb(): Promise<any> {
   if (!dbPromise) {
     dbPromise = (async () => {
-      const sqlite3 = await sqlite3InitModule({ printErr: console.error });
+      const sqlite3 = await sqlite3InitModule();
       if (!sqlite3?.oo1?.OpfsDb) {
         throw new Error('SQLite OPFS não está disponível neste navegador.');
       }

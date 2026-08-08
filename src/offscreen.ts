@@ -9,6 +9,7 @@ const REQUEST_DELAY_MS = 120;
 class DbClient {
   private worker = new Worker(new URL('./db-worker.ts', import.meta.url), { type: 'module' });
   private pending = new Map<string, { resolve: (value: any) => void; reject: (reason: Error) => void }>();
+  private fatalError: Error | null = null;
 
   constructor() {
     this.worker.addEventListener('message', (event: MessageEvent<DbResponse>) => {
@@ -19,9 +20,25 @@ class DbClient {
       if (response.ok) request.resolve(response.data);
       else request.reject(new Error(response.error ?? 'Falha no SQLite.'));
     });
+
+    this.worker.addEventListener('error', (event: ErrorEvent) => {
+      this.fail(new Error(`Falha ao iniciar o worker SQLite: ${event.message || 'erro desconhecido'}`));
+    });
+
+    this.worker.addEventListener('messageerror', () => {
+      this.fail(new Error('Falha de comunicação com o worker SQLite.'));
+    });
+  }
+
+  private fail(error: Error): void {
+    this.fatalError = error;
+    for (const request of this.pending.values()) request.reject(error);
+    this.pending.clear();
   }
 
   call<T>(action: string, payload: unknown = {}): Promise<T> {
+    if (this.fatalError) return Promise.reject(this.fatalError);
+
     const requestId = crypto.randomUUID();
     return new Promise<T>((resolve, reject) => {
       this.pending.set(requestId, { resolve, reject });
@@ -87,8 +104,10 @@ async function crawl(): Promise<void> {
   let syncId: number | null = null;
 
   try {
-    syncId = await db.call<number>('beginSync', { startedAt });
+    // Publica o estado antes de inicializar o SQLite. Assim, qualquer falha de
+    // bootstrap do WASM/OPFS aparece para o usuário em vez de parecer um clique sem efeito.
     await publish(status);
+    syncId = await db.call<number>('beginSync', { startedAt });
 
     const visited = new Set<string>();
     let currentUrl: string | null = FIRST_PAGE;

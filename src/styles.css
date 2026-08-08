@@ -6,16 +6,28 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 380px; background: #f5f7fa; }
+body { margin: 0; min-width: 410px; background: #f5f7fa; }
 button { font: inherit; }
+code { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
 
 .app-shell { padding: 18px; }
 .app-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.app-header--compact { margin-bottom: 12px; }
 .eyebrow { display: block; margin-bottom: 3px; color: #667085; font-size: 10px; font-weight: 750; letter-spacing: .14em; }
 h1 { margin: 0; font-size: 19px; line-height: 1.2; letter-spacing: -.02em; }
-.status-badge { border-radius: 999px; padding: 5px 9px; background: #e8edf3; color: #475467; font-size: 11px; font-weight: 700; }
+h2 { margin: 0; font-size: 14px; line-height: 1.3; letter-spacing: -.01em; }
+
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 14px; padding: 4px; border: 1px solid #dde3eb; border-radius: 11px; background: #e9edf2; }
+.tab-button { min-height: 34px; border: 0; border-radius: 8px; background: transparent; color: #667085; cursor: pointer; font-size: 12px; font-weight: 700; }
+.tab-button.is-active { background: #fff; color: #243b53; box-shadow: 0 1px 2px rgba(16, 24, 40, .08); }
+.tab-panel[hidden] { display: none; }
+.panel-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.panel-header p { margin: 3px 0 0; color: #667085; font-size: 11px; line-height: 1.4; }
+
+.status-badge { flex: none; border-radius: 999px; padding: 5px 9px; background: #e8edf3; color: #475467; font-size: 11px; font-weight: 700; }
 .status-badge[data-state="running"] { background: #e6f0ff; color: #174ea6; }
 .status-badge[data-state="completed"] { background: #e8f5ed; color: #176b3a; }
+.status-badge[data-state="cancelled"] { background: #fff3dc; color: #8a5a00; }
 .status-badge[data-state="error"] { background: #fdecec; color: #a32121; }
 
 .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -25,22 +37,26 @@ h1 { margin: 0; font-size: 19px; line-height: 1.2; letter-spacing: -.02em; }
 
 .progress-panel { margin: 12px 0; padding: 13px; border-radius: 12px; background: #fff; border: 1px solid #e1e6ed; }
 .progress-track { height: 5px; overflow: hidden; border-radius: 999px; background: #edf1f5; }
-.progress-bar { width: 0; height: 100%; border-radius: inherit; background: #315b8a; }
+.progress-bar { width: 0; height: 100%; border-radius: inherit; background: #315b8a; transition: width .18s ease; }
 .progress-bar.is-running { width: 38%; animation: scan 1.25s ease-in-out infinite alternate; }
 .progress-panel p { margin: 9px 0 0; color: #475467; font-size: 12px; line-height: 1.45; }
 
 .details { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 8px; }
+.details--downloads { grid-template-columns: 1fr 1fr; }
 .details div { min-width: 0; padding: 9px 10px; border-radius: 10px; background: #edf1f5; }
 .details span { display: block; color: #667085; font-size: 10px; margin-bottom: 4px; }
 .details strong { display: block; overflow: hidden; color: #344054; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 
+.helper-text { margin: 11px 0 0; color: #667085; font-size: 10.5px; line-height: 1.5; }
 .error-box { margin: 12px 0 0; padding: 10px 11px; border: 1px solid #f0caca; border-radius: 10px; background: #fff1f1; color: #8f1d1d; font-size: 11px; line-height: 1.45; }
 .actions { display: flex; gap: 8px; margin-top: 14px; }
-.actions button { min-height: 36px; border-radius: 9px; padding: 0 13px; cursor: pointer; font-weight: 700; }
+.actions--wrap { flex-wrap: wrap; }
+.actions button { min-height: 36px; border-radius: 9px; padding: 0 13px; cursor: pointer; font-weight: 700; font-size: 12px; }
 .primary-button { flex: 1; border: 1px solid #254f7c; background: #315b8a; color: #fff; }
 .primary-button:hover:not(:disabled) { background: #284f78; }
-.primary-button:disabled { cursor: default; opacity: .62; }
+.primary-button:disabled, .secondary-button:disabled { cursor: default; opacity: .55; }
 .secondary-button { border: 1px solid #ccd3dc; background: #fff; color: #344054; }
+.secondary-button:hover:not(:disabled) { background: #f8fafc; }
 
 @keyframes scan {
   from { transform: translateX(-10%); }
@@ -48,5 +64,6 @@ h1 { margin: 0; font-size: 19px; line-height: 1.2; letter-spacing: -.02em; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .progress-bar { transition: none; }
   .progress-bar.is-running { animation: none; width: 100%; opacity: .65; }
 }

@@ -131,6 +131,9 @@ async function fetchFileSize(relativeUrl: string | null): Promise<number | null>
 
     if (!response.ok) return null;
 
+    const contentType = response.headers.get('content-type')?.toLowerCase() ?? '';
+    if (contentType.includes('text/html')) return null;
+
     const contentEncoding = response.headers.get('content-encoding');
     if (contentEncoding && contentEncoding.toLowerCase() !== 'identity') return null;
 
@@ -138,7 +141,7 @@ async function fetchFileSize(relativeUrl: string | null): Promise<number | null>
     if (!rawLength || !/^\d+$/.test(rawLength)) return null;
 
     const bytes = Number(rawLength);
-    return Number.isSafeInteger(bytes) && bytes >= 0 ? bytes : null;
+    return Number.isSafeInteger(bytes) && bytes > 0 ? bytes : null;
   } finally {
     activeRequest = null;
   }

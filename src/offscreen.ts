@@ -33,6 +33,7 @@ class DbClient {
 const db = new DbClient();
 let running = false;
 let cancelled = false;
+let activeRequest: AbortController | null = null;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -47,6 +48,23 @@ function isAuthenticationFailure(response: Response, html: string): boolean {
   if (response.status === 401 || response.status === 403) return true;
   if (finalUrl.includes('/login') || finalUrl.includes('/usuarios/login')) return true;
   return /<input[^>]+type=["']password["']/i.test(html) && !/Tipo de Edi[cç][aã]o/i.test(html);
+}
+
+async function fetchPage(url: string): Promise<{ response: Response; html: string }> {
+  activeRequest = new AbortController();
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store',
+      redirect: 'follow',
+      signal: activeRequest.signal
+    });
+    const html = await response.text();
+    return { response, html };
+  } finally {
+    activeRequest = null;
+  }
 }
 
 async function crawl(): Promise<void> {
@@ -84,13 +102,7 @@ async function crawl(): Promise<void> {
       status.currentUrl = currentUrl;
       await publish(status);
 
-      const response = await fetch(currentUrl, {
-        method: 'GET',
-        credentials: 'include',
-        cache: 'no-store',
-        redirect: 'follow'
-      });
-      const html = await response.text();
+      const { response, html } = await fetchPage(currentUrl);
 
       if (!response.ok) throw new Error(`EGBANET respondeu HTTP ${response.status} na página ${pageNumber}.`);
       if (isAuthenticationFailure(response, html)) {
@@ -136,10 +148,12 @@ async function crawl(): Promise<void> {
     await db.call('finishSync', { syncId, status: 'completed', finishedAt: status.finishedAt });
     await publish(status);
   } catch (error) {
-    const isCancelled = error instanceof DOMException && error.name === 'AbortError';
+    const isCancelled = cancelled || (error instanceof DOMException && error.name === 'AbortError');
     status.state = isCancelled ? 'cancelled' : 'error';
     status.finishedAt = new Date().toISOString();
-    status.error = error instanceof Error ? error.message : String(error);
+    status.error = isCancelled
+      ? 'Sincronização cancelada pelo usuário.'
+      : error instanceof Error ? error.message : String(error);
     delete status.currentUrl;
 
     if (syncId !== null) {
@@ -152,6 +166,7 @@ async function crawl(): Promise<void> {
     }
     await publish(status);
   } finally {
+    activeRequest = null;
     running = false;
   }
 }
@@ -171,6 +186,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === 'CANCEL_SYNC') {
     cancelled = true;
+    activeRequest?.abort();
     sendResponse({ ok: true });
   }
 });

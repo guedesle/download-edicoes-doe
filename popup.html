@@ -7,42 +7,98 @@
   </head>
   <body>
     <main class="app-shell">
-      <header class="app-header">
+      <header class="app-header app-header--compact">
         <div>
           <span class="eyebrow">EGBANET</span>
-          <h1>Inventário de edições</h1>
+          <h1>Download de edições DOE</h1>
         </div>
-        <span id="statusBadge" class="status-badge">Pronto</span>
       </header>
 
-      <section class="summary-grid" aria-label="Resumo do inventário">
-        <article class="summary-card">
-          <span class="summary-label">Edições locais</span>
-          <strong id="totalEditions">0</strong>
-        </article>
-        <article class="summary-card">
-          <span class="summary-label">Páginas lidas</span>
-          <strong id="pagesProcessed">0</strong>
-        </article>
+      <nav class="tabs" role="tablist" aria-label="Operações">
+        <button id="inventoryTabButton" class="tab-button is-active" type="button" role="tab" aria-selected="true" aria-controls="inventoryPanel">Inventário</button>
+        <button id="downloadsTabButton" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="downloadsPanel">Links de download</button>
+      </nav>
+
+      <section id="inventoryPanel" class="tab-panel" role="tabpanel" aria-labelledby="inventoryTabButton">
+        <header class="panel-header">
+          <div>
+            <h2>Inventário de edições</h2>
+            <p>Coleta a listagem paginada e atualiza o SQLite local.</p>
+          </div>
+          <span id="statusBadge" class="status-badge">Pronto</span>
+        </header>
+
+        <section class="summary-grid" aria-label="Resumo do inventário">
+          <article class="summary-card">
+            <span class="summary-label">Edições locais</span>
+            <strong id="totalEditions">0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Páginas lidas</span>
+            <strong id="pagesProcessed">0</strong>
+          </article>
+        </section>
+
+        <section id="progressPanel" class="progress-panel" aria-live="polite">
+          <div class="progress-track" aria-hidden="true"><div id="progressBar" class="progress-bar"></div></div>
+          <p id="progressText">Nenhuma sincronização em andamento.</p>
+        </section>
+
+        <section class="details">
+          <div><span>Última sincronização</span><strong id="lastSync">—</strong></div>
+          <div><span>Novas</span><strong id="insertedCount">0</strong></div>
+          <div><span>Atualizadas</span><strong id="updatedCount">0</strong></div>
+        </section>
+
+        <p id="errorBox" class="error-box" hidden></p>
+
+        <footer class="actions">
+          <button id="syncButton" class="primary-button" type="button">Sincronizar edições</button>
+          <button id="cancelButton" class="secondary-button" type="button" hidden>Cancelar</button>
+        </footer>
       </section>
 
-      <section id="progressPanel" class="progress-panel" aria-live="polite">
-        <div class="progress-track" aria-hidden="true"><div id="progressBar" class="progress-bar"></div></div>
-        <p id="progressText">Nenhuma sincronização em andamento.</p>
+      <section id="downloadsPanel" class="tab-panel" role="tabpanel" aria-labelledby="downloadsTabButton" hidden>
+        <header class="panel-header">
+          <div>
+            <h2>Links de download</h2>
+            <p>Usa somente a primeira linha que contém “Versão Atual”.</p>
+          </div>
+          <span id="downloadStatusBadge" class="status-badge">Pronto</span>
+        </header>
+
+        <section class="summary-grid" aria-label="Resumo da captura de downloads">
+          <article class="summary-card">
+            <span class="summary-label">Edições capturadas</span>
+            <strong id="capturedEditions">0/0</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">Processadas agora</span>
+            <strong id="downloadProcessed">0</strong>
+          </article>
+        </section>
+
+        <section id="downloadProgressPanel" class="progress-panel" aria-live="polite">
+          <div class="progress-track" aria-hidden="true"><div id="downloadProgressBar" class="progress-bar"></div></div>
+          <p id="downloadProgressText">Nenhuma captura em andamento.</p>
+        </section>
+
+        <section class="details details--downloads">
+          <div><span>Assinados</span><strong id="signedLinksCount">0</strong></div>
+          <div><span>Diários</span><strong id="diaryLinksCount">0</strong></div>
+          <div><span>Tamanhos obtidos</span><strong id="sizesCount">0</strong></div>
+          <div><span>Falhas na rodada</span><strong id="downloadFailures">0</strong></div>
+        </section>
+
+        <p class="helper-text">O tamanho é consultado com <code>HEAD</code>, sem baixar o PDF. Quando o servidor não fornece <code>Content-Length</code>, o tamanho fica vazio no banco.</p>
+        <p id="downloadErrorBox" class="error-box" hidden></p>
+
+        <footer class="actions actions--wrap">
+          <button id="capturePendingButton" class="primary-button" type="button">Capturar pendentes</button>
+          <button id="captureAllButton" class="secondary-button" type="button">Recapturar todos</button>
+          <button id="cancelCaptureButton" class="secondary-button" type="button" hidden>Cancelar</button>
+        </footer>
       </section>
-
-      <section class="details">
-        <div><span>Última sincronização</span><strong id="lastSync">—</strong></div>
-        <div><span>Novas</span><strong id="insertedCount">0</strong></div>
-        <div><span>Atualizadas</span><strong id="updatedCount">0</strong></div>
-      </section>
-
-      <p id="errorBox" class="error-box" hidden></p>
-
-      <footer class="actions">
-        <button id="syncButton" class="primary-button" type="button">Sincronizar edições</button>
-        <button id="cancelButton" class="secondary-button" type="button" hidden>Cancelar</button>
-      </footer>
     </main>
     <script type="module" src="/src/popup.ts"></script>
   </body>

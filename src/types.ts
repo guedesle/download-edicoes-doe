@@ -1,4 +1,5 @@
 export type SyncState = 'idle' | 'running' | 'completed' | 'cancelled' | 'error';
+export type DownloadCaptureMode = 'pending' | 'all';
 
 export interface EditionRecord {
   egbanetId: number;
@@ -22,6 +23,16 @@ export interface ParsedEditionPage {
   nextHref: string | null;
 }
 
+export interface EditionDownloadLinks {
+  downloadAssinadoUrl: string | null;
+  downloadDiarioUrl: string | null;
+}
+
+export interface DownloadCaptureTarget {
+  egbanetId: number;
+  editUrl: string;
+}
+
 export interface SyncStatus {
   state: SyncState;
   startedAt?: string;
@@ -33,6 +44,29 @@ export interface SyncStatus {
   totalEditions: number;
   currentUrl?: string;
   error?: string;
+}
+
+export interface DownloadCaptureStatus {
+  state: SyncState;
+  mode: DownloadCaptureMode;
+  startedAt?: string;
+  finishedAt?: string;
+  totalEditions: number;
+  totalTargets: number;
+  processed: number;
+  signedFound: number;
+  diaryFound: number;
+  failures: number;
+  capturedEditions: number;
+  currentEditionId?: number;
+  error?: string;
+}
+
+export interface DownloadCaptureStats {
+  totalEditions: number;
+  capturedEditions: number;
+  signedLinks: number;
+  diaryLinks: number;
 }
 
 export interface DbResponse<T = unknown> {

@@ -77,11 +77,17 @@ async function publishCapture(status: DownloadCaptureStatus): Promise<void> {
   }
 }
 
-function isAuthenticationFailure(response: Response, html: string): boolean {
+function responseLooksUnauthenticated(response: Response): boolean {
   const finalUrl = response.url.toLowerCase();
-  if (response.status === 401 || response.status === 403) return true;
-  if (finalUrl.includes('/login') || finalUrl.includes('/usuarios/login')) return true;
-  return /<input[^>]+type=["']password["']/i.test(html);
+  return response.status === 401
+    || response.status === 403
+    || finalUrl.includes('/login')
+    || finalUrl.includes('/usuarios/login');
+}
+
+function isAuthenticationFailure(response: Response, html: string): boolean {
+  return responseLooksUnauthenticated(response)
+    || /<input[^>]+type=["']password["']/i.test(html);
 }
 
 async function fetchPage(url: string): Promise<{ response: Response; html: string }> {
@@ -96,6 +102,43 @@ async function fetchPage(url: string): Promise<{ response: Response; html: strin
     });
     const html = await response.text();
     return { response, html };
+  } finally {
+    activeRequest = null;
+  }
+}
+
+async function fetchFileSize(relativeUrl: string | null): Promise<number | null> {
+  if (!relativeUrl) return null;
+
+  const url = new URL(relativeUrl, EGBANET_ORIGIN);
+  if (url.origin !== EGBANET_ORIGIN || !/^\/admin\/edicoes\/download_versao\/\d+_\d+\/[01]$/.test(url.pathname)) {
+    return null;
+  }
+
+  activeRequest = new AbortController();
+  try {
+    const response = await fetch(url.href, {
+      method: 'HEAD',
+      credentials: 'include',
+      cache: 'no-store',
+      redirect: 'follow',
+      signal: activeRequest.signal
+    });
+
+    if (responseLooksUnauthenticated(response)) {
+      throw new AuthenticationError('Sessão do EGBANET expirada. Autentique-se no EGBANET e tente novamente.');
+    }
+
+    if (!response.ok) return null;
+
+    const contentEncoding = response.headers.get('content-encoding');
+    if (contentEncoding && contentEncoding.toLowerCase() !== 'identity') return null;
+
+    const rawLength = response.headers.get('content-length');
+    if (!rawLength || !/^\d+$/.test(rawLength)) return null;
+
+    const bytes = Number(rawLength);
+    return Number.isSafeInteger(bytes) && bytes >= 0 ? bytes : null;
   } finally {
     activeRequest = null;
   }
@@ -231,6 +274,8 @@ async function captureDownloadLinks(mode: DownloadCaptureMode): Promise<void> {
     processed: 0,
     signedFound: 0,
     diaryFound: 0,
+    signedSizesFound: 0,
+    diarySizesFound: 0,
     failures: 0,
     capturedEditions: 0
   };
@@ -257,14 +302,21 @@ async function captureDownloadLinks(mode: DownloadCaptureMode): Promise<void> {
         assertAuthenticated(response, html);
 
         const links = parseEditionDownloadLinks(html, target.egbanetId);
+        const downloadAssinadoBytes = await fetchFileSize(links.downloadAssinadoUrl);
+        const downloadDiarioBytes = await fetchFileSize(links.downloadDiarioUrl);
+
         await db.call('saveDownloadLinks', {
           egbanetId: target.egbanetId,
           ...links,
+          downloadAssinadoBytes,
+          downloadDiarioBytes,
           capturedAt: new Date().toISOString()
         });
 
         if (links.downloadAssinadoUrl) status.signedFound += 1;
         if (links.downloadDiarioUrl) status.diaryFound += 1;
+        if (downloadAssinadoBytes !== null) status.signedSizesFound += 1;
+        if (downloadDiarioBytes !== null) status.diarySizesFound += 1;
       } catch (error) {
         if (error instanceof AuthenticationError) throw error;
         if (captureCancelled || (error instanceof DOMException && error.name === 'AbortError')) throw error;

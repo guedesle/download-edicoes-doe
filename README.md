@@ -15,11 +15,15 @@ Os registros encontrados são persistidos em SQLite, dentro do OPFS da extensão
 
 ### Identidade de uma edição
 
-A chave técnica é `egbanet_id`. A identidade editorial também é protegida por restrição única composta por:
+A chave técnica persistida é `egbanet_id`, que identifica cada registro de edição no EGBANET.
+
+A combinação editorial abaixo é mantida como índice de consulta e correlação, mas não como restrição de unicidade:
 
 `tipo_edicao + data_edicao + numero_edicao`
 
-As sincronizações são idempotentes: registros existentes são atualizados por UPSERT, preservando a primeira data de coleta e atualizando a última coleta.
+Isso é intencional: durante a homologação foi observado que o EGBANET pode apresentar IDs técnicos distintos com a mesma combinação editorial. O inventário deve reproduzir fielmente esses registros em vez de descartar ou sobrescrever um deles.
+
+As sincronizações são idempotentes pelo `egbanet_id`: registros existentes são atualizados por UPSERT, preservando a primeira data de coleta e atualizando a última coleta.
 
 ## Arquitetura
 
@@ -68,8 +72,10 @@ A interface mostra páginas processadas, edições encontradas, registros novos/
 
 Principais tabelas:
 
-- `edicoes`: inventário consolidado das edições;
+- `edicoes`: inventário consolidado dos registros de edição;
 - `sincronizacoes`: histórico de execuções, contagens, estado e erro final quando houver.
+
+O schema atual é a versão 2. A migração da versão inicial remove automaticamente a restrição `UNIQUE(tipo_edicao, data_edicao, numero_edicao)` sem exigir limpeza manual do banco local.
 
 Campos vazios do EGBANET são armazenados como `NULL`. Datas editoriais são normalizadas para ISO (`YYYY-MM-DD`) e data/hora de publicação para `YYYY-MM-DDTHH:mm:ss`, sem inferência de fuso horário.
 

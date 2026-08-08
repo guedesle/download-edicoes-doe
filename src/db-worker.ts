@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS sincronizacoes (
 async function getDb(): Promise<any> {
   if (!dbPromise) {
     dbPromise = (async () => {
+      if (!self.crossOriginIsolated) {
+        throw new Error('SQLite OPFS requer isolamento COOP/COEP. Recarregue a extensão após atualizar o manifest.');
+      }
+
       const sqlite3 = await sqlite3InitModule();
       if (!sqlite3?.oo1?.OpfsDb) {
         throw new Error('SQLite OPFS não está disponível neste navegador.');

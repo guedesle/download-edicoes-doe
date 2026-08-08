@@ -36,9 +36,11 @@ export function parseBrDate(value: string): string {
 export function parseBrDateTime(value: string): string | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
-  const match = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
-  if (!match) throw new Error(`Data de publicação inválida: ${value}`);
-  return `${match[3]}-${match[2]}-${match[1]}T${match[4]}:${match[5]}:${match[6]}`;
+  const match = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{4})$/);
+  if (match) return `${match[3]}-${match[2]}-${match[1]}T${match[4]}:${match[5]}:${match[6]}`;
+  const normal = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  if (!normal) throw new Error(`Data de publicação inválida: ${value}`);
+  return `${normal[3]}-${normal[2]}-${normal[1]}T${normal[4]}:${normal[5]}:${normal[6]}`;
 }
 
 function resolveTable(document: Document): HTMLTableElement {
@@ -100,11 +102,11 @@ function resolveCurrentVersionRow(table: HTMLTableElement): HTMLTableRowElement 
   const rows = [...table.querySelectorAll<HTMLTableRowElement>('tbody > tr')];
   const current = rows.find((row) => {
     const firstCell = row.querySelector(':scope > td');
-    return normalize(text(firstCell ?? undefined)).startsWith('versao atual');
+    return normalize(text(firstCell ?? undefined)).includes('versao atual');
   });
 
   if (!current) {
-    throw new Error('A tabela de versões não possui uma linha identificada como Versão Atual.');
+    throw new Error('A tabela de versões não possui uma linha contendo a expressão Versão Atual.');
   }
   return current;
 }

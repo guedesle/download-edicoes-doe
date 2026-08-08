@@ -1,5 +1,8 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   build: {
@@ -7,9 +10,9 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        popup: resolve(__dirname, 'popup.html'),
-        offscreen: resolve(__dirname, 'offscreen.html'),
-        'service-worker': resolve(__dirname, 'src/service-worker.ts')
+        popup: resolve(root, 'popup.html'),
+        offscreen: resolve(root, 'offscreen.html'),
+        'service-worker': resolve(root, 'src/service-worker.ts')
       },
       output: {
         entryFileNames: '[name].js',

@@ -74,6 +74,7 @@ function requiredInteger(value: string, label: string): number {
 function parseRow(row: Element, headers: Map<string, number>, pageNumber: number): EditionRecord {
   const cells = [...row.querySelectorAll(':scope > td')];
   const actionsCell = cell(cells, headers, 'Ações');
+  const editLink = actionsCell?.querySelector<HTMLAnchorElement>('a[title="Editar"], a[href^="/admin/edicoes/edit/"]');
   const viewLink = actionsCell?.querySelector<HTMLAnchorElement>('a[title="Visualizar Edição"], a[href^="/admin/edicoes/view/"]');
   const egbanetId = requiredInteger(text(cell(cells, headers, 'ID')), 'ID EGBANET');
 
@@ -89,6 +90,7 @@ function parseRow(row: Element, headers: Map<string, number>, pageNumber: number
     downloads: integer(text(cell(cells, headers, 'Downloads'))),
     publicadaInternet: yesNo(text(cell(cells, headers, 'Pub. Internet'))),
     dataPublicacao: parseBrDateTime(text(cell(cells, headers, 'Data Pub.'))),
+    editUrl: editLink?.getAttribute('href') ?? `/admin/edicoes/edit/${egbanetId}`,
     viewUrl: viewLink?.getAttribute('href') ?? `/admin/edicoes/view/${egbanetId}`,
     paginaOrigem: pageNumber
   };

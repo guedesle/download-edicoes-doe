@@ -41,12 +41,12 @@ Offscreen Document
 
 O parser resolve as colunas pelos textos dos cabeçalhos da tabela, e não por posições fixas. Mudanças que removam a tabela esperada geram erro explícito em vez de produzir registros incorretos silenciosamente.
 
-Da coluna **Ações**, são persistidos somente os links necessários às próximas etapas:
+Da coluna **Ações**, são inventariados somente os links necessários às próximas etapas:
 
 - `edit_url`: link **Editar**, no padrão `/admin/edicoes/edit/{egbanet_id}`;
 - `view_url`: link **Visualizar Edição**, no padrão `/admin/edicoes/view/{egbanet_id}`.
 
-A extensão não executa ações administrativas do EGBANET como publicar, remover, gerar ou ordenar matérias.
+Nesta etapa a extensão apenas coleta e persiste esses URLs; ela não aciona o formulário de edição nem outras ações administrativas do EGBANET.
 
 ## Desenvolvimento
 

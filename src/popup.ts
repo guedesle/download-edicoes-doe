@@ -73,9 +73,17 @@ function render(status: SyncStatus): void {
 }
 
 async function send(type: 'START_SYNC' | 'CANCEL_SYNC'): Promise<void> {
-  const result = await chrome.runtime.sendMessage({ target: 'service-worker', type });
-  if (result?.ok === false && result.reason !== 'already-running') {
-    render({ ...EMPTY_STATUS, state: 'error', error: result.reason ?? 'Não foi possível iniciar a operação.' });
+  try {
+    const result = await chrome.runtime.sendMessage({ target: 'service-worker', type });
+    if (result?.ok === false && result.reason !== 'already-running') {
+      render({ ...EMPTY_STATUS, state: 'error', error: result.reason ?? 'Não foi possível iniciar a operação.' });
+    }
+  } catch (error) {
+    render({
+      ...EMPTY_STATUS,
+      state: 'error',
+      error: `Falha ao comunicar com a extensão: ${error instanceof Error ? error.message : String(error)}`
+    });
   }
 }
 

@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Download de Edições DOE",
+  "description": "Inventário local das edições do EGBANET para suporte ao download de edições completas.",
+  "version": "0.1.0",
+  "minimum_chrome_version": "116",
+  "permissions": ["offscreen", "storage"],
+  "host_permissions": ["https://egbanet.egba.ba.gov.br/*"],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Download de Edições DOE",
+    "default_popup": "popup.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
+}

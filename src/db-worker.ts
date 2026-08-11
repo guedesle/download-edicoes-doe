@@ -145,7 +145,7 @@ function editionsTableExists(db: any): boolean {
 }
 
 function migrateLegacyToV5(db: any): void {
-  db.transaction('IMMEDIATE', () => {
+  db.transaction(() => {
     db.exec(`
       DROP INDEX IF EXISTS idx_edicoes_data;
       DROP INDEX IF EXISTS idx_edicoes_numero;
@@ -183,7 +183,7 @@ function migrateLegacyToV5(db: any): void {
 }
 
 function migrateV3ToV5(db: any): void {
-  db.transaction('IMMEDIATE', () => {
+  db.transaction(() => {
     db.exec(`
       ALTER TABLE edicoes ADD COLUMN download_assinado_url TEXT;
       ALTER TABLE edicoes ADD COLUMN download_assinado_bytes INTEGER;
@@ -197,7 +197,7 @@ function migrateV3ToV5(db: any): void {
 }
 
 function migrateV4ToV5(db: any): void {
-  db.transaction('IMMEDIATE', () => {
+  db.transaction(() => {
     db.exec(`
       ALTER TABLE edicoes ADD COLUMN download_assinado_bytes INTEGER;
       ALTER TABLE edicoes ADD COLUMN download_diario_bytes INTEGER;
@@ -208,7 +208,7 @@ function migrateV4ToV5(db: any): void {
 }
 
 function migrateV5ToV6(db: any): void {
-  db.transaction('IMMEDIATE', () => {
+  db.transaction(() => {
     db.exec(`${DOWNLOAD_TABLES}${DOWNLOAD_INDEXES}PRAGMA user_version=${SCHEMA_VERSION};`);
   });
 }
@@ -316,7 +316,7 @@ async function upsertBatch(editions: EditionRecord[]): Promise<{ inserted: numbe
       ultima_coleta_em=excluded.ultima_coleta_em
   `;
 
-  db.transaction('IMMEDIATE', () => {
+  db.transaction(() => {
     for (const edition of editions) {
       db.exec({
         sql,
@@ -513,7 +513,7 @@ function itemSource(row: BatchEditionRow, type: DownloadBatchItemType): { url: s
 
 async function createDownloadBatch(input: DownloadBatchFilter): Promise<DownloadBatchCreated> {
   const db = await getDb();
-  return db.transaction('IMMEDIATE', () => {
+  return db.transaction(() => {
     const { filter, rows } = queryBatchEditions(db, input);
     const preview = buildBatchPreview(filter, rows);
     if (preview.editions === 0) throw new Error('Nenhuma edição corresponde ao filtro informado.');

@@ -145,8 +145,7 @@ function editionsTableExists(db: any): boolean {
 }
 
 function migrateLegacyToV5(db: any): void {
-  db.exec('BEGIN IMMEDIATE');
-  try {
+  db.transaction('IMMEDIATE', () => {
     db.exec(`
       DROP INDEX IF EXISTS idx_edicoes_data;
       DROP INDEX IF EXISTS idx_edicoes_numero;
@@ -180,16 +179,11 @@ function migrateLegacyToV5(db: any): void {
       ${EDITIONS_INDEXES}
       PRAGMA user_version=5;
     `);
-    db.exec('COMMIT');
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
+  });
 }
 
 function migrateV3ToV5(db: any): void {
-  db.exec('BEGIN IMMEDIATE');
-  try {
+  db.transaction('IMMEDIATE', () => {
     db.exec(`
       ALTER TABLE edicoes ADD COLUMN download_assinado_url TEXT;
       ALTER TABLE edicoes ADD COLUMN download_assinado_bytes INTEGER;
@@ -199,38 +193,24 @@ function migrateV3ToV5(db: any): void {
       ${EDITIONS_INDEXES}
       PRAGMA user_version=5;
     `);
-    db.exec('COMMIT');
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
+  });
 }
 
 function migrateV4ToV5(db: any): void {
-  db.exec('BEGIN IMMEDIATE');
-  try {
+  db.transaction('IMMEDIATE', () => {
     db.exec(`
       ALTER TABLE edicoes ADD COLUMN download_assinado_bytes INTEGER;
       ALTER TABLE edicoes ADD COLUMN download_diario_bytes INTEGER;
       ${EDITIONS_INDEXES}
       PRAGMA user_version=5;
     `);
-    db.exec('COMMIT');
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
+  });
 }
 
 function migrateV5ToV6(db: any): void {
-  db.exec('BEGIN IMMEDIATE');
-  try {
+  db.transaction('IMMEDIATE', () => {
     db.exec(`${DOWNLOAD_TABLES}${DOWNLOAD_INDEXES}PRAGMA user_version=${SCHEMA_VERSION};`);
-    db.exec('COMMIT');
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
+  });
 }
 
 function initializeSchema(db: any): void {
@@ -336,8 +316,7 @@ async function upsertBatch(editions: EditionRecord[]): Promise<{ inserted: numbe
       ultima_coleta_em=excluded.ultima_coleta_em
   `;
 
-  db.exec('BEGIN IMMEDIATE');
-  try {
+  db.transaction('IMMEDIATE', () => {
     for (const edition of editions) {
       db.exec({
         sql,
@@ -361,11 +340,7 @@ async function upsertBatch(editions: EditionRecord[]): Promise<{ inserted: numbe
         ]
       });
     }
-    db.exec('COMMIT');
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
+  });
 
   const updated = editions.filter((edition) => existing.has(edition.egbanetId)).length;
   const inserted = editions.length - updated;
@@ -538,8 +513,7 @@ function itemSource(row: BatchEditionRow, type: DownloadBatchItemType): { url: s
 
 async function createDownloadBatch(input: DownloadBatchFilter): Promise<DownloadBatchCreated> {
   const db = await getDb();
-  db.exec('BEGIN IMMEDIATE');
-  try {
+  return db.transaction('IMMEDIATE', () => {
     const { filter, rows } = queryBatchEditions(db, input);
     const preview = buildBatchPreview(filter, rows);
     if (preview.editions === 0) throw new Error('Nenhuma edição corresponde ao filtro informado.');
@@ -606,12 +580,8 @@ async function createDownloadBatch(input: DownloadBatchFilter): Promise<Download
       }
     }
 
-    db.exec('COMMIT');
     return { batchId, items: preview.availableFiles, preview };
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
+  });
 }
 
 async function exportDatabase(): Promise<Uint8Array> {

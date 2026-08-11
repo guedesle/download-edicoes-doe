@@ -6,7 +6,7 @@ Extensão Chrome para inventariar localmente as edições disponíveis no EGBANE
 
 A interface possui duas abas independentes:
 
-1. **Inventário** — percorre a listagem paginada de edições e mantém o SQLite local atualizado.
+1. **Inventário** — percorre a listagem paginada de edições, mantém o SQLite local atualizado e permite exportar uma cópia do banco.
 2. **Links de download** — visita as URLs `edit_url` já inventariadas e captura os links da versão atual de cada edição.
 
 ### Inventário
@@ -24,6 +24,14 @@ Da coluna **Ações**, são persistidos:
 - `view_url`: `/admin/edicoes/view/{egbanet_id}`.
 
 A chave técnica é `egbanet_id`. A combinação `tipo_edicao + data_edicao + numero_edicao` é mantida como índice de consulta, não como restrição de unicidade, porque o EGBANET pode apresentar IDs técnicos distintos para a mesma combinação editorial.
+
+#### Exportar SQLite
+
+O botão **Exportar SQLite**, na aba Inventário, serializa o banco aberto usando a API oficial `sqlite3_js_db_export()` e abre o diálogo **Salvar como** do Chrome com o nome sugerido:
+
+`download-edicoes-doe.sqlite3`
+
+A exportação cria uma cópia do banco e **não remove, move ou altera** o arquivo persistido no OPFS. Sincronização, captura de links e exportação são mutuamente exclusivas para que o arquivo exportado represente um snapshot consistente.
 
 ### Captura dos links de download
 
@@ -63,6 +71,7 @@ A conversão para MB deve ser feita na apresentação (`bytes / 1024 / 1024`), p
 Popup MV3
    │
 Service Worker
+   ├── chrome.downloads (exportação SQLite)
    │
 Offscreen Document
    ├── GET autenticado da listagem e das páginas edit
@@ -72,7 +81,7 @@ Offscreen Document
           └── SQLite WASM + OPFS
 ```
 
-O inventário e a captura são mutuamente exclusivos para evitar concorrência desnecessária no banco e no EGBANET.
+O inventário, a captura e a exportação são mutuamente exclusivos para evitar concorrência desnecessária no banco e no EGBANET.
 
 A extensão não aciona publicar, remover, gerar edição, ordenar matérias nem qualquer outra ação administrativa.
 
@@ -116,7 +125,8 @@ Depois do build:
 3. Carregue ou recarregue a pasta `dist`.
 4. Autentique-se no EGBANET.
 5. Na aba **Inventário**, sincronize as edições.
-6. Na aba **Links de download**, execute **Capturar pendentes**.
+6. Use **Exportar SQLite** quando precisar consultar o banco fora do navegador.
+7. Na aba **Links de download**, execute **Capturar pendentes**.
 
 ## Qualidade
 

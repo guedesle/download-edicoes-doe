@@ -1,6 +1,9 @@
 import { parseEditionDownloadLinks, parseEditionPage } from './parser';
 import type {
   DbResponse,
+  DownloadBatchCreated,
+  DownloadBatchFilter,
+  DownloadBatchPreview,
   DownloadCaptureMode,
   DownloadCaptureStats,
   DownloadCaptureStatus,
@@ -49,6 +52,7 @@ const db = new DbClient();
 let inventoryRunning = false;
 let captureRunning = false;
 let exportRunning = false;
+let batchPlanningRunning = false;
 let inventoryCancelled = false;
 let captureCancelled = false;
 let activeRequest: AbortController | null = null;
@@ -58,7 +62,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 function anyOperationRunning(): boolean {
-  return inventoryRunning || captureRunning || exportRunning;
+  return inventoryRunning || captureRunning || exportRunning || batchPlanningRunning;
 }
 
 async function publishInventory(status: SyncStatus): Promise<void> {
@@ -359,6 +363,21 @@ async function captureDownloadLinks(mode: DownloadCaptureMode): Promise<void> {
   }
 }
 
+async function previewDownloadBatch(filter: DownloadBatchFilter): Promise<DownloadBatchPreview> {
+  if (anyOperationRunning()) throw new Error('Já existe uma operação em andamento.');
+  return db.call<DownloadBatchPreview>('previewDownloadBatch', { filter });
+}
+
+async function createDownloadBatch(filter: DownloadBatchFilter): Promise<DownloadBatchCreated> {
+  if (anyOperationRunning()) throw new Error('Já existe uma operação em andamento.');
+  batchPlanningRunning = true;
+  try {
+    return await db.call<DownloadBatchCreated>('createDownloadBatch', { filter });
+  } finally {
+    batchPlanningRunning = false;
+  }
+}
+
 async function prepareSqliteExport(): Promise<{ blobUrl: string; filename: string; bytes: number }> {
   if (anyOperationRunning()) throw new Error('Já existe uma operação em andamento.');
   exportRunning = true;
@@ -419,6 +438,26 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'GET_DOWNLOAD_CAPTURE_STATS') {
     void db.call<DownloadCaptureStats>('downloadCaptureStats')
       .then((stats) => sendResponse({ ok: true, stats }))
+      .catch((error) => sendResponse({
+        ok: false,
+        reason: error instanceof Error ? error.message : String(error)
+      }));
+    return true;
+  }
+
+  if (message.type === 'PREVIEW_DOWNLOAD_BATCH') {
+    void previewDownloadBatch(message.filter as DownloadBatchFilter)
+      .then((preview) => sendResponse({ ok: true, preview }))
+      .catch((error) => sendResponse({
+        ok: false,
+        reason: error instanceof Error ? error.message : String(error)
+      }));
+    return true;
+  }
+
+  if (message.type === 'CREATE_DOWNLOAD_BATCH') {
+    void createDownloadBatch(message.filter as DownloadBatchFilter)
+      .then((created) => sendResponse({ ok: true, created }))
       .catch((error) => sendResponse({
         ok: false,
         reason: error instanceof Error ? error.message : String(error)

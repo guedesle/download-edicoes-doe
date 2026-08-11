@@ -14,9 +14,10 @@
         </div>
       </header>
 
-      <nav class="tabs" role="tablist" aria-label="Operações">
+      <nav class="tabs tabs--three" role="tablist" aria-label="Operações">
         <button id="inventoryTabButton" class="tab-button is-active" type="button" role="tab" aria-selected="true" aria-controls="inventoryPanel">Inventário</button>
-        <button id="downloadsTabButton" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="downloadsPanel">Links de download</button>
+        <button id="downloadsTabButton" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="downloadsPanel">Links</button>
+        <button id="batchTabButton" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="batchPanel">Baixar</button>
       </nav>
 
       <section id="inventoryPanel" class="tab-panel" role="tabpanel" aria-labelledby="inventoryTabButton">
@@ -98,6 +99,98 @@
           <button id="capturePendingButton" class="primary-button" type="button">Capturar pendentes</button>
           <button id="captureAllButton" class="secondary-button" type="button">Recapturar todos</button>
           <button id="cancelCaptureButton" class="secondary-button" type="button" hidden>Cancelar</button>
+        </footer>
+      </section>
+
+      <section id="batchPanel" class="tab-panel" role="tabpanel" aria-labelledby="batchTabButton" hidden>
+        <header class="panel-header">
+          <div>
+            <h2>Downloads de edições</h2>
+            <p>Monte e confira o lote antes de iniciar qualquer arquivo.</p>
+          </div>
+          <span class="status-badge">Planejamento</span>
+        </header>
+
+        <section class="batch-form" aria-label="Configuração do lote">
+          <label class="form-field">
+            <span>Selecionar por</span>
+            <select id="batchCriterionSelect">
+              <option value="period">Período de edições</option>
+              <option value="egbanet_ids">ID EGBANET</option>
+            </select>
+          </label>
+
+          <div id="batchPeriodFields" class="form-grid form-grid--two">
+            <label class="form-field">
+              <span>Data inicial</span>
+              <input id="batchStartDate" type="date" />
+            </label>
+            <label class="form-field">
+              <span>Data final</span>
+              <input id="batchEndDate" type="date" />
+            </label>
+          </div>
+
+          <label id="batchIdsField" class="form-field" hidden>
+            <span>IDs EGBANET</span>
+            <textarea id="batchIdsInput" rows="3" placeholder="Ex.: 21535, 21536, 21540"></textarea>
+            <small>Separe IDs por vírgula, espaço ou nova linha. Máximo de 500.</small>
+          </label>
+
+          <div class="form-grid form-grid--two">
+            <label class="form-field">
+              <span>Arquivos</span>
+              <select id="batchFileTypeSelect">
+                <option value="normal">Normal</option>
+                <option value="signed">Assinado</option>
+                <option value="both">Normal + assinado</option>
+              </select>
+            </label>
+            <label class="form-field">
+              <span>Nome do lote</span>
+              <input id="batchNameInput" type="text" maxlength="80" placeholder="Opcional" />
+            </label>
+          </div>
+        </section>
+
+        <p id="batchErrorBox" class="error-box" hidden></p>
+        <p id="batchSuccessBox" class="success-box" hidden></p>
+
+        <section id="batchPreviewPanel" class="batch-preview" hidden aria-live="polite">
+          <div class="summary-grid">
+            <article class="summary-card">
+              <span class="summary-label">Edições</span>
+              <strong id="batchPreviewEditions">0</strong>
+            </article>
+            <article class="summary-card">
+              <span class="summary-label">Arquivos disponíveis</span>
+              <strong id="batchPreviewFiles">0</strong>
+            </article>
+            <article class="summary-card">
+              <span class="summary-label">Páginas</span>
+              <strong id="batchPreviewPages">0</strong>
+            </article>
+            <article class="summary-card">
+              <span class="summary-label">Volume conhecido</span>
+              <strong id="batchPreviewSize">0 MB</strong>
+            </article>
+          </div>
+
+          <section class="details details--downloads batch-preview-details">
+            <div><span>Normais</span><strong id="batchPreviewNormal">0</strong></div>
+            <div><span>Assinados</span><strong id="batchPreviewSigned">0</strong></div>
+            <div><span>Links ausentes</span><strong id="batchPreviewMissingLinks">0</strong></div>
+            <div><span>Tamanhos desconhecidos</span><strong id="batchPreviewUnknownSizes">0</strong></div>
+          </section>
+
+          <p id="batchPreviewNote" class="helper-text"></p>
+        </section>
+
+        <p class="helper-text">Criar o lote apenas grava o planejamento no SQLite. <strong>Nenhum PDF é baixado nesta etapa.</strong> A escolha do diretório de destino e a execução entram no próximo incremento.</p>
+
+        <footer class="actions actions--wrap">
+          <button id="previewBatchButton" class="secondary-button" type="button">Calcular prévia</button>
+          <button id="createBatchButton" class="primary-button" type="button" disabled>Criar lote</button>
         </footer>
       </section>
     </main>

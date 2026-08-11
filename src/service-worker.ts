@@ -73,7 +73,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     'CANCEL_SYNC',
     'START_DOWNLOAD_CAPTURE',
     'CANCEL_DOWNLOAD_CAPTURE',
-    'GET_DOWNLOAD_CAPTURE_STATS'
+    'GET_DOWNLOAD_CAPTURE_STATS',
+    'PREVIEW_DOWNLOAD_BATCH',
+    'CREATE_DOWNLOAD_BATCH'
   ]);
 
   if (forwardedTypes.has(message.type)) {
@@ -81,9 +83,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       try {
         await ensureOffscreenDocument();
         const result = await chrome.runtime.sendMessage({
-          target: 'offscreen',
-          type: message.type,
-          mode: message.mode
+          ...message,
+          target: 'offscreen'
         });
         sendResponse(result ?? { ok: true });
       } catch (error) {

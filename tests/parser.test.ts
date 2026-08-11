@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { parseBrDate, parseBrDateTime, parseEditionPage } from '../src/parser';
+import {
+  parseBrDate,
+  parseBrDateTime,
+  parseEditionDownloadLinks,
+  parseEditionPage
+} from '../src/parser';
 
 const html = `
 <table class="table">
@@ -19,6 +24,44 @@ const html = `
   </tr></tbody>
 </table>
 <div class="paging_bootstrap pagination"><ul><li class="next"><a href="/admin/edicoes/index/page:2">›</a></li></ul></div>`;
+
+const versionsHtml = `
+<table id="table_list" class="table">
+  <thead><tr>
+    <th>Versão Número</th>
+    <th>Data/hora</th>
+    <th>Enviado por</th>
+    <th>Download Assinado</th>
+    <th>Marca D'água</th>
+    <th>Normal</th>
+  </tr></thead>
+  <tbody>
+    <tr>
+      <td>Versão Atual (3ª)</td>
+      <td>06/03/2026 01:17:45</td>
+      <td>gilmar.nascimento</td>
+      <td><a href="/admin/edicoes/download_versao/21535_3/1">Download do Assinado</a></td>
+      <td><a href="/admin/edicoes/download_versao/21535_3/2">Download do Marca D'água</a></td>
+      <td><a href="/admin/edicoes/download_versao/21535_3/0">Download do Diário</a></td>
+    </tr>
+    <tr>
+      <td>2ª Versão</td>
+      <td>06/03/2026 00:28:44</td>
+      <td>gilmar.nascimento</td>
+      <td><a href="/admin/edicoes/download_versao/21535_2/1">histórico assinado</a></td>
+      <td><a href="/admin/edicoes/download_versao/21535_2/2">histórico marca</a></td>
+      <td><a href="/admin/edicoes/download_versao/21535_2/0">histórico diário</a></td>
+    </tr>
+    <tr>
+      <td>Versão Atual - ocorrência anômala posterior</td>
+      <td>06/03/2026 00:24:44</td>
+      <td>gilmar.nascimento</td>
+      <td><a href="/admin/edicoes/download_versao/21535_1/1">não usar</a></td>
+      <td></td>
+      <td><a href="/admin/edicoes/download_versao/21535_1/0">não usar</a></td>
+    </tr>
+  </tbody>
+</table>`;
 
 describe('parser EGBANET', () => {
   it('normaliza datas brasileiras', () => {
@@ -61,5 +104,24 @@ describe('parser EGBANET', () => {
 
   it('falha explicitamente quando a tabela esperada desaparece', () => {
     expect(() => parseEditionPage('<html><body>login</body></html>', 1)).toThrow(/Tabela de edições não encontrada/);
+  });
+
+  it('captura somente a primeira linha que contém Versão Atual', () => {
+    expect(parseEditionDownloadLinks(versionsHtml, 21535)).toEqual({
+      downloadAssinadoUrl: '/admin/edicoes/download_versao/21535_3/1',
+      downloadDiarioUrl: '/admin/edicoes/download_versao/21535_3/0'
+    });
+  });
+
+  it('rejeita links de download cujo ID não corresponde à edição consultada', () => {
+    expect(parseEditionDownloadLinks(versionsHtml, 99999)).toEqual({
+      downloadAssinadoUrl: null,
+      downloadDiarioUrl: null
+    });
+  });
+
+  it('falha quando não existe linha contendo Versão Atual', () => {
+    const withoutCurrent = versionsHtml.replaceAll('Versão Atual', 'Versão histórica');
+    expect(() => parseEditionDownloadLinks(withoutCurrent, 21535)).toThrow(/Versão Atual/);
   });
 });

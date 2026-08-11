@@ -1,4 +1,4 @@
-import type { EditionRecord, ParsedEditionPage } from './types';
+import type { EditionDownloadLinks, EditionRecord, ParsedEditionPage } from './types';
 
 const REQUIRED_HEADERS = ['id', 'tipo de edicao', 'data edicao', 'numero'];
 
@@ -93,6 +93,57 @@ function parseRow(row: Element, headers: Map<string, number>, pageNumber: number
     editUrl: editLink?.getAttribute('href') ?? `/admin/edicoes/edit/${egbanetId}`,
     viewUrl: viewLink?.getAttribute('href') ?? `/admin/edicoes/view/${egbanetId}`,
     paginaOrigem: pageNumber
+  };
+}
+
+function resolveCurrentVersionRow(
+  table: HTMLTableElement,
+  headers: Map<string, number>
+): HTMLTableRowElement {
+  if (!headers.has('versao numero')) {
+    throw new Error('A tabela de versões não possui a coluna Versão Número.');
+  }
+
+  const rows = [...table.querySelectorAll<HTMLTableRowElement>('tbody > tr')];
+  const current = rows.find((row) => {
+    const cells = [...row.querySelectorAll(':scope > td')];
+    return normalize(text(cell(cells, headers, 'Versão Número'))).includes('versao atual');
+  });
+
+  if (!current) {
+    throw new Error('A tabela de versões não possui uma linha contendo a expressão Versão Atual.');
+  }
+  return current;
+}
+
+function validateDownloadHref(href: string | null, egbanetId: number, kind: '0' | '1'): string | null {
+  if (!href) return null;
+  const match = href.match(/^\/admin\/edicoes\/download_versao\/(\d+)_\d+\/([012])$/);
+  if (!match) return null;
+  if (Number(match[1]) !== egbanetId || match[2] !== kind) return null;
+  return href;
+}
+
+export function parseEditionDownloadLinks(html: string, egbanetId: number): EditionDownloadLinks {
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  const table = document.querySelector<HTMLTableElement>('table#table_list');
+  if (!table) {
+    throw new Error(`Tabela de versões não encontrada na edição ${egbanetId}.`);
+  }
+
+  const headers = headerMap(table);
+  if (!headers.has('download assinado') || !headers.has('normal')) {
+    throw new Error(`Colunas de download esperadas não foram encontradas na edição ${egbanetId}.`);
+  }
+
+  const currentRow = resolveCurrentVersionRow(table, headers);
+  const cells = [...currentRow.querySelectorAll(':scope > td')];
+  const signedHref = cell(cells, headers, 'Download Assinado')?.querySelector<HTMLAnchorElement>('a[href]')?.getAttribute('href') ?? null;
+  const diaryHref = cell(cells, headers, 'Normal')?.querySelector<HTMLAnchorElement>('a[href]')?.getAttribute('href') ?? null;
+
+  return {
+    downloadAssinadoUrl: validateDownloadHref(signedHref, egbanetId, '1'),
+    downloadDiarioUrl: validateDownloadHref(diaryHref, egbanetId, '0')
   };
 }
 

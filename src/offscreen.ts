@@ -11,6 +11,7 @@ import type {
 const EGBANET_ORIGIN = 'https://egbanet.egba.ba.gov.br';
 const FIRST_PAGE = `${EGBANET_ORIGIN}/admin/edicoes`;
 const REQUEST_DELAY_MS = 120;
+const EXPORT_URL_TTL_MS = 30 * 60 * 1000;
 
 class AuthenticationError extends Error {}
 
@@ -47,12 +48,17 @@ class DbClient {
 const db = new DbClient();
 let inventoryRunning = false;
 let captureRunning = false;
+let exportRunning = false;
 let inventoryCancelled = false;
 let captureCancelled = false;
 let activeRequest: AbortController | null = null;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function anyOperationRunning(): boolean {
+  return inventoryRunning || captureRunning || exportRunning;
 }
 
 async function publishInventory(status: SyncStatus): Promise<void> {
@@ -162,7 +168,7 @@ function validatedEditUrl(target: DownloadCaptureTarget): string {
 }
 
 async function crawl(): Promise<void> {
-  if (inventoryRunning || captureRunning) return;
+  if (anyOperationRunning()) return;
   inventoryRunning = true;
   inventoryCancelled = false;
 
@@ -263,7 +269,7 @@ async function crawl(): Promise<void> {
 }
 
 async function captureDownloadLinks(mode: DownloadCaptureMode): Promise<void> {
-  if (inventoryRunning || captureRunning) return;
+  if (anyOperationRunning()) return;
   captureRunning = true;
   captureCancelled = false;
 
@@ -353,11 +359,30 @@ async function captureDownloadLinks(mode: DownloadCaptureMode): Promise<void> {
   }
 }
 
+async function prepareSqliteExport(): Promise<{ blobUrl: string; filename: string; bytes: number }> {
+  if (anyOperationRunning()) throw new Error('Já existe uma operação em andamento.');
+  exportRunning = true;
+  try {
+    const bytes = await db.call<Uint8Array>('exportDatabase');
+    const exportBytes = new Uint8Array(bytes);
+    const blob = new Blob([exportBytes], { type: 'application/x-sqlite3' });
+    const blobUrl = URL.createObjectURL(blob);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), EXPORT_URL_TTL_MS);
+    return {
+      blobUrl,
+      filename: 'download-edicoes-doe.sqlite3',
+      bytes: exportBytes.byteLength
+    };
+  } finally {
+    exportRunning = false;
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.target !== 'offscreen') return;
 
   if (message.type === 'START_SYNC') {
-    if (inventoryRunning || captureRunning) {
+    if (anyOperationRunning()) {
       sendResponse({ ok: false, reason: 'operation-running' });
     } else {
       void crawl();
@@ -374,7 +399,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === 'START_DOWNLOAD_CAPTURE') {
-    if (inventoryRunning || captureRunning) {
+    if (anyOperationRunning()) {
       sendResponse({ ok: false, reason: 'operation-running' });
     } else {
       const mode: DownloadCaptureMode = message.mode === 'all' ? 'all' : 'pending';
@@ -394,6 +419,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'GET_DOWNLOAD_CAPTURE_STATS') {
     void db.call<DownloadCaptureStats>('downloadCaptureStats')
       .then((stats) => sendResponse({ ok: true, stats }))
+      .catch((error) => sendResponse({
+        ok: false,
+        reason: error instanceof Error ? error.message : String(error)
+      }));
+    return true;
+  }
+
+  if (message.type === 'PREPARE_SQLITE_EXPORT') {
+    void prepareSqliteExport()
+      .then((result) => sendResponse({ ok: true, ...result }))
       .catch((error) => sendResponse({
         ok: false,
         reason: error instanceof Error ? error.message : String(error)

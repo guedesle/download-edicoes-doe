@@ -17,6 +17,31 @@ async function persistStatus(key: string, status: unknown): Promise<void> {
   await chrome.storage.local.set({ [key]: status });
 }
 
+async function exportSqlite(): Promise<{ ok: boolean; downloadId?: number; bytes?: number; reason?: string }> {
+  await ensureOffscreenDocument();
+  const prepared = await chrome.runtime.sendMessage({
+    target: 'offscreen',
+    type: 'PREPARE_SQLITE_EXPORT'
+  });
+
+  if (!prepared?.ok) {
+    return { ok: false, reason: prepared?.reason ?? 'Não foi possível preparar o banco para exportação.' };
+  }
+
+  const downloadId = await chrome.downloads.download({
+    url: prepared.blobUrl,
+    filename: prepared.filename ?? 'download-edicoes-doe.sqlite3',
+    saveAs: true,
+    conflictAction: 'uniquify'
+  });
+
+  return {
+    ok: true,
+    downloadId,
+    bytes: Number(prepared.bytes) || undefined
+  };
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.target !== 'service-worker') return;
 
@@ -30,6 +55,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           reason: error instanceof Error ? error.message : String(error)
         });
       });
+    return true;
+  }
+
+  if (message.type === 'EXPORT_SQLITE') {
+    void exportSqlite()
+      .then((result) => sendResponse(result))
+      .catch((error) => sendResponse({
+        ok: false,
+        reason: error instanceof Error ? error.message : String(error)
+      }));
     return true;
   }
 

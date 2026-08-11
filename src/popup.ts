@@ -26,6 +26,7 @@ const elements = {
   updatedCount: document.querySelector<HTMLElement>('#updatedCount')!,
   errorBox: document.querySelector<HTMLElement>('#errorBox')!,
   syncButton: document.querySelector<HTMLButtonElement>('#syncButton')!,
+  exportSqliteButton: document.querySelector<HTMLButtonElement>('#exportSqliteButton')!,
   cancelButton: document.querySelector<HTMLButtonElement>('#cancelButton')!,
 
   downloadStatusBadge: document.querySelector<HTMLElement>('#downloadStatusBadge')!,
@@ -79,6 +80,7 @@ const EMPTY_DOWNLOAD_STATS: DownloadCaptureStats = {
 let inventoryStatus: SyncStatus = EMPTY_STATUS;
 let downloadStatus: DownloadCaptureStatus = EMPTY_DOWNLOAD_STATUS;
 let downloadStats: DownloadCaptureStats = EMPTY_DOWNLOAD_STATS;
+let exportRunning = false;
 
 function formatDate(value?: string): string {
   if (!value) return '—';
@@ -101,10 +103,12 @@ function stateLabel(state: SyncStatus['state']): string {
 function syncControls(): void {
   const inventoryRunning = inventoryStatus.state === 'running';
   const captureRunning = downloadStatus.state === 'running';
-  const anyRunning = inventoryRunning || captureRunning;
+  const anyRunning = inventoryRunning || captureRunning || exportRunning;
 
   elements.syncButton.disabled = anyRunning;
   elements.syncButton.textContent = inventoryRunning ? 'Sincronizando…' : 'Sincronizar edições';
+  elements.exportSqliteButton.disabled = anyRunning;
+  elements.exportSqliteButton.textContent = exportRunning ? 'Preparando…' : 'Exportar SQLite';
   elements.cancelButton.hidden = !inventoryRunning;
 
   elements.capturePendingButton.disabled = anyRunning;
@@ -216,6 +220,26 @@ async function startInventory(): Promise<void> {
   }
 }
 
+async function exportSqlite(): Promise<void> {
+  exportRunning = true;
+  elements.errorBox.hidden = true;
+  elements.errorBox.textContent = '';
+  syncControls();
+
+  try {
+    const result = await send('EXPORT_SQLITE');
+    if (result?.ok === false) {
+      throw new Error(result.reason ?? 'Não foi possível exportar o SQLite.');
+    }
+  } catch (error) {
+    elements.errorBox.hidden = false;
+    elements.errorBox.textContent = `Falha ao exportar SQLite: ${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    exportRunning = false;
+    syncControls();
+  }
+}
+
 async function startCapture(mode: DownloadCaptureMode): Promise<void> {
   try {
     const result = await send('START_DOWNLOAD_CAPTURE', { mode });
@@ -239,6 +263,7 @@ async function refreshDownloadStats(): Promise<void> {
 elements.inventoryTabButton.addEventListener('click', () => activateTab('inventory'));
 elements.downloadsTabButton.addEventListener('click', () => activateTab('downloads'));
 elements.syncButton.addEventListener('click', () => void startInventory());
+elements.exportSqliteButton.addEventListener('click', () => void exportSqlite());
 elements.cancelButton.addEventListener('click', () => void send('CANCEL_SYNC'));
 elements.capturePendingButton.addEventListener('click', () => void startCapture('pending'));
 elements.captureAllButton.addEventListener('click', () => void startCapture('all'));

@@ -10,6 +10,7 @@ import type {
 
 const DB_NAME = '/download-edicoes-doe.sqlite3';
 const SCHEMA_VERSION = 5;
+let sqlite3Promise: Promise<any> | null = null;
 let dbPromise: Promise<any> | null = null;
 
 const EDITIONS_TABLE = `
@@ -166,6 +167,11 @@ function initializeSchema(db: any): void {
   db.exec(`${EDITIONS_INDEXES}${SYNC_TABLE}`);
 }
 
+async function getSqlite3(): Promise<any> {
+  if (!sqlite3Promise) sqlite3Promise = sqlite3InitModule();
+  return sqlite3Promise;
+}
+
 async function getDb(): Promise<any> {
   if (!dbPromise) {
     dbPromise = (async () => {
@@ -173,7 +179,7 @@ async function getDb(): Promise<any> {
         throw new Error('SQLite OPFS requer isolamento COOP/COEP. Recarregue a extensão após atualizar o manifest.');
       }
 
-      const sqlite3 = await sqlite3InitModule();
+      const sqlite3 = await getSqlite3();
       if (!sqlite3?.oo1?.OpfsDb) {
         throw new Error('SQLite OPFS não está disponível neste navegador.');
       }
@@ -344,6 +350,16 @@ async function saveDownloadLinks(payload: {
   });
 }
 
+async function exportDatabase(): Promise<Uint8Array> {
+  const db = await getDb();
+  const sqlite3 = await getSqlite3();
+  const bytes = sqlite3.capi.sqlite3_js_db_export(db);
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+    throw new Error('O SQLite retornou uma exportação vazia.');
+  }
+  return bytes;
+}
+
 async function handle(action: string, payload: any): Promise<unknown> {
   switch (action) {
     case 'beginSync': return beginSync(payload.startedAt);
@@ -357,6 +373,7 @@ async function handle(action: string, payload: any): Promise<unknown> {
     case 'downloadCaptureStats': return downloadCaptureStats();
     case 'listDownloadCaptureTargets': return listDownloadCaptureTargets(payload.mode);
     case 'saveDownloadLinks': return saveDownloadLinks(payload);
+    case 'exportDatabase': return exportDatabase();
     default: throw new Error(`Ação SQLite desconhecida: ${action}`);
   }
 }

@@ -2,6 +2,15 @@ const OFFSCREEN_URL = 'offscreen.html';
 const INVENTORY_STATUS_KEY = 'inventorySyncStatus';
 const DOWNLOAD_STATUS_KEY = 'downloadCaptureStatus';
 
+async function configureSidePanel(): Promise<void> {
+  await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+}
+
+void configureSidePanel().catch(() => undefined);
+chrome.runtime.onInstalled.addListener(() => {
+  void configureSidePanel().catch(() => undefined);
+});
+
 async function ensureOffscreenDocument(): Promise<void> {
   const exists = await chrome.offscreen.hasDocument();
   if (exists) return;

@@ -5,7 +5,7 @@
   "version": "0.2.0",
   "version_name": "0.2.0",
   "minimum_chrome_version": "116",
-  "permissions": ["offscreen", "storage", "downloads"],
+  "permissions": ["offscreen", "storage", "downloads", "unlimitedStorage"],
   "host_permissions": ["https://egbanet.egba.ba.gov.br/*"],
   "background": {
     "service_worker": "service-worker.js",

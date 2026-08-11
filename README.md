@@ -1,13 +1,14 @@
 # Download de Edições DOE
 
-Extensão Chrome para inventariar localmente as edições disponíveis no EGBANET e preparar o download de edições completas do Diário Oficial.
+Extensão Chrome para inventariar localmente as edições disponíveis no EGBANET, capturar os links da versão atual, planejar lotes de download e preparar a preservação e análise do acervo.
 
 ## Fluxos atuais
 
-A interface possui duas abas independentes:
+A interface possui três abas operacionais:
 
 1. **Inventário** — percorre a listagem paginada de edições, mantém o SQLite local atualizado e permite exportar uma cópia do banco.
-2. **Links de download** — visita as URLs `edit_url` já inventariadas e captura os links da versão atual de cada edição.
+2. **Links** — visita as URLs `edit_url` inventariadas e captura os links e tamanhos da versão atual de cada edição.
+3. **Baixar** — cria uma prévia e persiste lotes de arquivos normais, assinados ou ambos. Nesta etapa o lote é planejado, mas nenhum PDF é iniciado automaticamente.
 
 ### Inventário
 
@@ -27,11 +28,11 @@ A chave técnica é `egbanet_id`. A combinação `tipo_edicao + data_edicao + nu
 
 #### Exportar SQLite
 
-O botão **Exportar SQLite**, na aba Inventário, serializa o banco aberto usando a API oficial `sqlite3_js_db_export()` e abre o diálogo **Salvar como** do Chrome com o nome sugerido:
+O botão **Exportar SQLite**, na aba Inventário, serializa o banco aberto usando `sqlite3_js_db_export()` e abre o diálogo **Salvar como** do Chrome com o nome sugerido:
 
 `download-edicoes-doe.sqlite3`
 
-A exportação cria uma cópia do banco e **não remove, move ou altera** o arquivo persistido no OPFS. Sincronização, captura de links e exportação são mutuamente exclusivas para que o arquivo exportado represente um snapshot consistente.
+A exportação cria uma cópia do banco e **não remove, move ou altera** o arquivo persistido no OPFS.
 
 ### Captura dos links de download
 
@@ -43,27 +44,39 @@ Na tabela `#table_list`, o parser percorre as linhas de cima para baixo e usa **
 
 Dessa linha são persistidos:
 
-- `download_assinado_url`: link da coluna **Download Assinado**, validado no padrão `/admin/edicoes/download_versao/{id}_{versao}/1`;
-- `download_diario_url`: link da coluna **Normal**, validado no padrão `/admin/edicoes/download_versao/{id}_{versao}/0`.
+- `download_assinado_url`: coluna **Download Assinado**, padrão `/admin/edicoes/download_versao/{id}_{versao}/1`;
+- `download_diario_url`: coluna **Normal**, padrão `/admin/edicoes/download_versao/{id}_{versao}/0`.
 
-O ID presente em cada URL precisa coincidir com o `egbanet_id` consultado. Links inesperados ou de outra edição não são gravados.
+O ID presente em cada URL precisa coincidir com o `egbanet_id` consultado.
 
-A aba permite:
+Depois de identificar cada link, a extensão faz `HEAD` autenticado. Quando `Content-Length` é confiável, persiste o tamanho exato em bytes em `download_assinado_bytes` e `download_diario_bytes`. Não é feito `GET` do PDF apenas para descobrir tamanho.
 
-- **Capturar pendentes**: processa somente edições ainda não capturadas;
-- **Recapturar todos**: atualiza novamente links e tamanhos de todo o inventário;
-- cancelar a operação preservando tudo que já foi persistido.
+### Planejamento de lotes
 
-### Tamanho dos arquivos sem download
+A aba **Baixar** permite montar um lote por:
 
-Depois de identificar cada link, a extensão faz uma requisição HTTP `HEAD` autenticada. Não é feito `GET` do PDF para descobrir tamanho.
+- intervalo de `data_edicao`; ou
+- lista manual de até 500 IDs técnicos EGBANET.
 
-Quando a resposta fornece um `Content-Length` confiável, o valor exato é armazenado em bytes:
+O usuário escolhe **Normal**, **Assinado** ou **Normal + assinado** e pode informar um nome para o lote.
 
-- `download_assinado_bytes`;
-- `download_diario_bytes`.
+Antes de criar o lote, a extensão calcula uma prévia com:
 
-A conversão para MB deve ser feita na apresentação (`bytes / 1024 / 1024`), preservando a precisão no banco. Se `HEAD` não for suportado, `Content-Length` não estiver disponível ou a resposta usar uma codificação que impeça inferir o tamanho original com segurança, o campo fica `NULL` e o link continua válido.
+- edições encontradas;
+- arquivos disponíveis;
+- páginas conhecidas;
+- volume conhecido;
+- links ausentes;
+- tamanhos desconhecidos;
+- IDs que não existem no inventário local.
+
+Ao confirmar **Criar lote**, são inseridos registros em `download_lotes` e `download_itens` com status `queued`. Apenas arquivos com URL capturada entram em `download_itens`. **Nenhum PDF é baixado neste incremento.**
+
+Os nomes planejados são determinísticos e os caminhos relativos seguem `AAAA/MM/`, por exemplo:
+
+`2022/07/2022-07-31_edicao-12345_id-21535_normal.pdf`
+
+A escolha do diretório de destino e o motor de execução pertencem ao próximo incremento.
 
 ## Arquitetura
 
@@ -71,38 +84,31 @@ A conversão para MB deve ser feita na apresentação (`bytes / 1024 / 1024`), p
 Popup MV3
    │
 Service Worker
-   ├── chrome.downloads (exportação SQLite)
+   ├── roteamento de operações
+   └── chrome.downloads (exportação SQLite)
    │
 Offscreen Document
-   ├── GET autenticado da listagem e das páginas edit
-   ├── HEAD autenticado dos downloads
+   ├── GET autenticado da listagem e páginas edit
+   ├── HEAD autenticado dos arquivos
    ├── DOMParser
    └── Dedicated Worker
           └── SQLite WASM + OPFS
 ```
 
-O inventário, a captura e a exportação são mutuamente exclusivos para evitar concorrência desnecessária no banco e no EGBANET.
+Operações de escrita/planejamento são serializadas para evitar concorrência desnecessária sobre o SQLite.
 
-A extensão não aciona publicar, remover, gerar edição, ordenar matérias nem qualquer outra ação administrativa.
+A extensão não aciona publicar, remover, gerar edição, ordenar matérias nem qualquer outra ação administrativa do EGBANET.
 
 ## Banco local
 
 Principais tabelas:
 
-- `edicoes`: inventário consolidado e metadados de download;
-- `sincronizacoes`: histórico das sincronizações do inventário.
+- `edicoes`: inventário consolidado e metadados dos arquivos;
+- `sincronizacoes`: histórico das sincronizações;
+- `download_lotes`: cabeçalho e resumo dos lotes planejados/executados;
+- `download_itens`: arquivos concretos pertencentes a cada lote.
 
-Campos de download adicionados à tabela `edicoes`:
-
-```text
-download_assinado_url
-download_assinado_bytes
-download_diario_url
-download_diario_bytes
-download_links_capturados_em
-```
-
-O schema atual é a **versão 5**. Bancos anteriores são migrados automaticamente em transação, preservando os registros já coletados.
+O schema atual é a **versão 6**. A migração v5→v6 cria somente as tabelas e índices de lotes, preservando o inventário, links e tamanhos já coletados.
 
 ## Desenvolvimento e homologação
 
@@ -124,19 +130,24 @@ Depois do build:
 2. Ative **Modo do desenvolvedor**.
 3. Carregue ou recarregue a pasta `dist`.
 4. Autentique-se no EGBANET.
-5. Na aba **Inventário**, sincronize as edições.
-6. Use **Exportar SQLite** quando precisar consultar o banco fora do navegador.
-7. Na aba **Links de download**, execute **Capturar pendentes**.
+5. Na aba **Inventário**, sincronize as edições se necessário.
+6. Na aba **Links**, capture os links necessários.
+7. Na aba **Baixar**, configure um período ou IDs EGBANET, selecione o tipo de arquivo e clique em **Calcular prévia**.
+8. Confira edições, arquivos, páginas, volume e lacunas.
+9. Clique em **Criar lote** e confirme que a mensagem informa que nenhum download foi iniciado.
 
 ## Qualidade
 
 Os testes cobrem, entre outros pontos:
 
-- parsing por cabeçalhos em vez de posições fixas;
+- parsing por cabeçalhos;
 - `edit_url` e `view_url`;
 - validação da paginação;
-- captura somente da primeira linha contendo **Versão Atual**;
-- rejeição de links cujo ID não corresponde à edição consultada;
-- falha explícita quando a linha **Versão Atual** não existe.
+- primeira ocorrência de **Versão Atual**;
+- validação do ID dos links;
+- listas de IDs EGBANET;
+- validação de período;
+- expansão normal/assinado/ambos;
+- geração determinística de nomes e caminhos dos itens do lote.
 
-O CI executa testes e build TypeScript/Vite nos pushes das branches `feat/**` e nos pull requests para `main`.
+O CI está configurado para executar testes e build nos pushes das branches `feat/**` e nos pull requests definidos pelo workflow do projeto.

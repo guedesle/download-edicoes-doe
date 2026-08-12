@@ -68,7 +68,6 @@ function mountQueryUi(): void {
             <option value="any">Todos</option>
             <option value="yes">Somente suplementos</option>
             <option value="no">Sem suplemento</option>
-            <option value="unknown">Não informado</option>
           </select>
         </label>
         <label class="form-field">

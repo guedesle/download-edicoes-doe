@@ -1,6 +1,22 @@
 const OFFSCREEN_URL = 'offscreen.html';
 const INVENTORY_STATUS_KEY = 'inventorySyncStatus';
 const DOWNLOAD_STATUS_KEY = 'downloadCaptureStatus';
+const BATCH_DOWNLOAD_STATUS_KEY = 'batchDownloadStatus';
+
+function storedState(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const state = (value as { state?: unknown }).state;
+  return typeof state === 'string' ? state : undefined;
+}
+
+async function configureSidePanel(): Promise<void> {
+  await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+}
+
+void configureSidePanel().catch(() => undefined);
+chrome.runtime.onInstalled.addListener(() => {
+  void configureSidePanel().catch(() => undefined);
+});
 
 async function ensureOffscreenDocument(): Promise<void> {
   const exists = await chrome.offscreen.hasDocument();
@@ -9,7 +25,7 @@ async function ensureOffscreenDocument(): Promise<void> {
   await chrome.offscreen.createDocument({
     url: OFFSCREEN_URL,
     reasons: [chrome.offscreen.Reason.DOM_PARSER],
-    justification: 'Processar HTML autenticado do EGBANET e manter o worker SQLite durante as operações.'
+    justification: 'Processar HTML autenticado, manter SQLite e gravar lotes de PDFs no diretório autorizado.'
   });
 }
 
@@ -17,7 +33,20 @@ async function persistStatus(key: string, status: unknown): Promise<void> {
   await chrome.storage.local.set({ [key]: status });
 }
 
+async function isBatchDownloadRunning(): Promise<boolean> {
+  const result = await chrome.storage.local.get(BATCH_DOWNLOAD_STATUS_KEY);
+  return storedState(result[BATCH_DOWNLOAD_STATUS_KEY]) === 'running';
+}
+
+async function anotherOperationIsRunning(): Promise<boolean> {
+  const result = await chrome.storage.local.get([INVENTORY_STATUS_KEY, DOWNLOAD_STATUS_KEY, BATCH_DOWNLOAD_STATUS_KEY]);
+  return storedState(result[INVENTORY_STATUS_KEY]) === 'running'
+    || storedState(result[DOWNLOAD_STATUS_KEY]) === 'running'
+    || storedState(result[BATCH_DOWNLOAD_STATUS_KEY]) === 'running';
+}
+
 async function exportSqlite(): Promise<{ ok: boolean; downloadId?: number; bytes?: number; reason?: string }> {
+  if (await isBatchDownloadRunning()) return { ok: false, reason: 'Já existe um lote de downloads em execução.' };
   await ensureOffscreenDocument();
   const prepared = await chrome.runtime.sendMessage({
     target: 'offscreen',
@@ -45,8 +74,16 @@ async function exportSqlite(): Promise<{ ok: boolean; downloadId?: number; bytes
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.target !== 'service-worker') return;
 
-  if (message.type === 'STATUS_UPDATE' || message.type === 'DOWNLOAD_STATUS_UPDATE') {
-    const key = message.type === 'STATUS_UPDATE' ? INVENTORY_STATUS_KEY : DOWNLOAD_STATUS_KEY;
+  if (
+    message.type === 'STATUS_UPDATE'
+    || message.type === 'DOWNLOAD_STATUS_UPDATE'
+    || message.type === 'BATCH_DOWNLOAD_STATUS_UPDATE'
+  ) {
+    const key = message.type === 'STATUS_UPDATE'
+      ? INVENTORY_STATUS_KEY
+      : message.type === 'DOWNLOAD_STATUS_UPDATE'
+        ? DOWNLOAD_STATUS_KEY
+        : BATCH_DOWNLOAD_STATUS_KEY;
     void persistStatus(key, message.status)
       .then(() => sendResponse({ ok: true }))
       .catch((error) => {
@@ -73,17 +110,30 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     'CANCEL_SYNC',
     'START_DOWNLOAD_CAPTURE',
     'CANCEL_DOWNLOAD_CAPTURE',
-    'GET_DOWNLOAD_CAPTURE_STATS'
+    'GET_DOWNLOAD_CAPTURE_STATS',
+    'PREVIEW_DOWNLOAD_BATCH',
+    'CREATE_DOWNLOAD_BATCH',
+    'START_BATCH_DOWNLOAD',
+    'CANCEL_BATCH_DOWNLOAD'
   ]);
 
   if (forwardedTypes.has(message.type)) {
     void (async () => {
       try {
+        if (message.type === 'START_BATCH_DOWNLOAD') {
+          if (await anotherOperationIsRunning()) {
+            sendResponse({ ok: false, reason: 'operation-running' });
+            return;
+          }
+        } else if (message.type !== 'CANCEL_BATCH_DOWNLOAD' && await isBatchDownloadRunning()) {
+          sendResponse({ ok: false, reason: 'operation-running' });
+          return;
+        }
+
         await ensureOffscreenDocument();
         const result = await chrome.runtime.sendMessage({
-          target: 'offscreen',
-          type: message.type,
-          mode: message.mode
+          ...message,
+          target: 'offscreen'
         });
         sendResponse(result ?? { ok: true });
       } catch (error) {

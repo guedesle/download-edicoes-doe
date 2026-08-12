@@ -1,5 +1,10 @@
 import './styles.css';
+import { parseEgbanetIdList } from './download-batches';
 import type {
+  DownloadBatchCreated,
+  DownloadBatchFileType,
+  DownloadBatchFilter,
+  DownloadBatchPreview,
   DownloadCaptureMode,
   DownloadCaptureStats,
   DownloadCaptureStatus,
@@ -9,11 +14,15 @@ import type {
 const INVENTORY_STATUS_KEY = 'inventorySyncStatus';
 const DOWNLOAD_STATUS_KEY = 'downloadCaptureStatus';
 
+type AppTab = 'inventory' | 'downloads' | 'batch';
+
 const elements = {
   inventoryTabButton: document.querySelector<HTMLButtonElement>('#inventoryTabButton')!,
   downloadsTabButton: document.querySelector<HTMLButtonElement>('#downloadsTabButton')!,
+  batchTabButton: document.querySelector<HTMLButtonElement>('#batchTabButton')!,
   inventoryPanel: document.querySelector<HTMLElement>('#inventoryPanel')!,
   downloadsPanel: document.querySelector<HTMLElement>('#downloadsPanel')!,
+  batchPanel: document.querySelector<HTMLElement>('#batchPanel')!,
 
   statusBadge: document.querySelector<HTMLElement>('#statusBadge')!,
   totalEditions: document.querySelector<HTMLElement>('#totalEditions')!,
@@ -42,7 +51,30 @@ const elements = {
   downloadErrorBox: document.querySelector<HTMLElement>('#downloadErrorBox')!,
   capturePendingButton: document.querySelector<HTMLButtonElement>('#capturePendingButton')!,
   captureAllButton: document.querySelector<HTMLButtonElement>('#captureAllButton')!,
-  cancelCaptureButton: document.querySelector<HTMLButtonElement>('#cancelCaptureButton')!
+  cancelCaptureButton: document.querySelector<HTMLButtonElement>('#cancelCaptureButton')!,
+
+  batchCriterionSelect: document.querySelector<HTMLSelectElement>('#batchCriterionSelect')!,
+  batchPeriodFields: document.querySelector<HTMLElement>('#batchPeriodFields')!,
+  batchIdsField: document.querySelector<HTMLElement>('#batchIdsField')!,
+  batchStartDate: document.querySelector<HTMLInputElement>('#batchStartDate')!,
+  batchEndDate: document.querySelector<HTMLInputElement>('#batchEndDate')!,
+  batchIdsInput: document.querySelector<HTMLTextAreaElement>('#batchIdsInput')!,
+  batchFileTypeSelect: document.querySelector<HTMLSelectElement>('#batchFileTypeSelect')!,
+  batchNameInput: document.querySelector<HTMLInputElement>('#batchNameInput')!,
+  batchErrorBox: document.querySelector<HTMLElement>('#batchErrorBox')!,
+  batchSuccessBox: document.querySelector<HTMLElement>('#batchSuccessBox')!,
+  batchPreviewPanel: document.querySelector<HTMLElement>('#batchPreviewPanel')!,
+  batchPreviewEditions: document.querySelector<HTMLElement>('#batchPreviewEditions')!,
+  batchPreviewFiles: document.querySelector<HTMLElement>('#batchPreviewFiles')!,
+  batchPreviewPages: document.querySelector<HTMLElement>('#batchPreviewPages')!,
+  batchPreviewSize: document.querySelector<HTMLElement>('#batchPreviewSize')!,
+  batchPreviewNormal: document.querySelector<HTMLElement>('#batchPreviewNormal')!,
+  batchPreviewSigned: document.querySelector<HTMLElement>('#batchPreviewSigned')!,
+  batchPreviewMissingLinks: document.querySelector<HTMLElement>('#batchPreviewMissingLinks')!,
+  batchPreviewUnknownSizes: document.querySelector<HTMLElement>('#batchPreviewUnknownSizes')!,
+  batchPreviewNote: document.querySelector<HTMLElement>('#batchPreviewNote')!,
+  previewBatchButton: document.querySelector<HTMLButtonElement>('#previewBatchButton')!,
+  createBatchButton: document.querySelector<HTMLButtonElement>('#createBatchButton')!
 };
 
 const EMPTY_STATUS: SyncStatus = {
@@ -68,19 +100,11 @@ const EMPTY_DOWNLOAD_STATUS: DownloadCaptureStatus = {
   capturedEditions: 0
 };
 
-const EMPTY_DOWNLOAD_STATS: DownloadCaptureStats = {
-  totalEditions: 0,
-  capturedEditions: 0,
-  signedLinks: 0,
-  diaryLinks: 0,
-  signedSizes: 0,
-  diarySizes: 0
-};
-
 let inventoryStatus: SyncStatus = EMPTY_STATUS;
 let downloadStatus: DownloadCaptureStatus = EMPTY_DOWNLOAD_STATUS;
-let downloadStats: DownloadCaptureStats = EMPTY_DOWNLOAD_STATS;
 let exportRunning = false;
+let batchBusy = false;
+let currentBatchPreview: DownloadBatchPreview | null = null;
 
 function formatDate(value?: string): string {
   if (!value) return '—';
@@ -88,6 +112,14 @@ function formatDate(value?: string): string {
     dateStyle: 'short',
     timeStyle: 'medium'
   }).format(new Date(value));
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB';
+  const mb = bytes / 1024 / 1024;
+  if (mb < 1024) return `${mb.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} MB`;
+  const gb = mb / 1024;
+  return `${gb.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} GB`;
 }
 
 function stateLabel(state: SyncStatus['state']): string {
@@ -105,16 +137,20 @@ function syncControls(): void {
   const captureRunning = downloadStatus.state === 'running';
   const anyRunning = inventoryRunning || captureRunning || exportRunning;
 
-  elements.syncButton.disabled = anyRunning;
+  elements.syncButton.disabled = anyRunning || batchBusy;
   elements.syncButton.textContent = inventoryRunning ? 'Sincronizando…' : 'Sincronizar edições';
-  elements.exportSqliteButton.disabled = anyRunning;
+  elements.exportSqliteButton.disabled = anyRunning || batchBusy;
   elements.exportSqliteButton.textContent = exportRunning ? 'Preparando…' : 'Exportar SQLite';
   elements.cancelButton.hidden = !inventoryRunning;
 
-  elements.capturePendingButton.disabled = anyRunning;
-  elements.captureAllButton.disabled = anyRunning;
+  elements.capturePendingButton.disabled = anyRunning || batchBusy;
+  elements.captureAllButton.disabled = anyRunning || batchBusy;
   elements.capturePendingButton.textContent = captureRunning ? 'Capturando…' : 'Capturar pendentes';
   elements.cancelCaptureButton.hidden = !captureRunning;
+
+  elements.previewBatchButton.disabled = anyRunning || batchBusy;
+  elements.previewBatchButton.textContent = batchBusy ? 'Processando…' : 'Calcular prévia';
+  elements.createBatchButton.disabled = anyRunning || batchBusy || currentBatchPreview === null;
 }
 
 function renderInventory(status: SyncStatus): void {
@@ -144,7 +180,6 @@ function renderInventory(status: SyncStatus): void {
 }
 
 function renderDownloadStats(stats: DownloadCaptureStats): void {
-  downloadStats = stats;
   elements.capturedEditions.textContent = `${stats.capturedEditions.toLocaleString('pt-BR')}/${stats.totalEditions.toLocaleString('pt-BR')}`;
   elements.signedLinksCount.textContent = stats.signedLinks.toLocaleString('pt-BR');
   elements.diaryLinksCount.textContent = stats.diaryLinks.toLocaleString('pt-BR');
@@ -185,16 +220,23 @@ function renderDownload(status: DownloadCaptureStatus): void {
   syncControls();
 }
 
-function activateTab(tab: 'inventory' | 'downloads'): void {
+function activateTab(tab: AppTab): void {
   const inventory = tab === 'inventory';
-  elements.inventoryPanel.hidden = !inventory;
-  elements.downloadsPanel.hidden = inventory;
-  elements.inventoryTabButton.classList.toggle('is-active', inventory);
-  elements.downloadsTabButton.classList.toggle('is-active', !inventory);
-  elements.inventoryTabButton.setAttribute('aria-selected', String(inventory));
-  elements.downloadsTabButton.setAttribute('aria-selected', String(!inventory));
+  const downloads = tab === 'downloads';
+  const batch = tab === 'batch';
 
-  if (!inventory) void refreshDownloadStats();
+  elements.inventoryPanel.hidden = !inventory;
+  elements.downloadsPanel.hidden = !downloads;
+  elements.batchPanel.hidden = !batch;
+
+  elements.inventoryTabButton.classList.toggle('is-active', inventory);
+  elements.downloadsTabButton.classList.toggle('is-active', downloads);
+  elements.batchTabButton.classList.toggle('is-active', batch);
+  elements.inventoryTabButton.setAttribute('aria-selected', String(inventory));
+  elements.downloadsTabButton.setAttribute('aria-selected', String(downloads));
+  elements.batchTabButton.setAttribute('aria-selected', String(batch));
+
+  if (downloads) void refreshDownloadStats();
 }
 
 async function send(type: string, extra: Record<string, unknown> = {}): Promise<any> {
@@ -260,14 +302,136 @@ async function refreshDownloadStats(): Promise<void> {
   }
 }
 
+function updateBatchCriterionFields(): void {
+  const byPeriod = elements.batchCriterionSelect.value === 'period';
+  elements.batchPeriodFields.hidden = !byPeriod;
+  elements.batchIdsField.hidden = byPeriod;
+}
+
+function clearBatchMessages(): void {
+  elements.batchErrorBox.hidden = true;
+  elements.batchErrorBox.textContent = '';
+  elements.batchSuccessBox.hidden = true;
+  elements.batchSuccessBox.textContent = '';
+}
+
+function invalidateBatchPreview(): void {
+  currentBatchPreview = null;
+  elements.batchPreviewPanel.hidden = true;
+  elements.createBatchButton.disabled = true;
+  clearBatchMessages();
+  syncControls();
+}
+
+function collectBatchFilter(): DownloadBatchFilter {
+  const criterion = elements.batchCriterionSelect.value === 'egbanet_ids' ? 'egbanet_ids' : 'period';
+  const fileType = elements.batchFileTypeSelect.value as DownloadBatchFileType;
+  const name = elements.batchNameInput.value.trim() || undefined;
+
+  if (criterion === 'period') {
+    const startDate = elements.batchStartDate.value;
+    const endDate = elements.batchEndDate.value;
+    if (!startDate || !endDate) throw new Error('Informe a data inicial e a data final.');
+    if (startDate > endDate) throw new Error('A data inicial não pode ser posterior à data final.');
+    return { criterion, fileType, startDate, endDate, name };
+  }
+
+  const egbanetIds = parseEgbanetIdList(elements.batchIdsInput.value);
+  if (egbanetIds.length === 0) throw new Error('Informe ao menos um ID EGBANET.');
+  return { criterion, fileType, egbanetIds, name };
+}
+
+function renderBatchPreview(preview: DownloadBatchPreview): void {
+  elements.batchPreviewEditions.textContent = preview.editions.toLocaleString('pt-BR');
+  elements.batchPreviewFiles.textContent = preview.availableFiles.toLocaleString('pt-BR');
+  elements.batchPreviewPages.textContent = preview.pages.toLocaleString('pt-BR');
+  elements.batchPreviewSize.textContent = formatBytes(preview.knownBytes);
+  elements.batchPreviewNormal.textContent = preview.normalFiles.toLocaleString('pt-BR');
+  elements.batchPreviewSigned.textContent = preview.signedFiles.toLocaleString('pt-BR');
+  elements.batchPreviewMissingLinks.textContent = preview.missingLinks.toLocaleString('pt-BR');
+  elements.batchPreviewUnknownSizes.textContent = preview.unknownSizes.toLocaleString('pt-BR');
+
+  const notes: string[] = [];
+  if (preview.missingEditions > 0) notes.push(`${preview.missingEditions} ID(s) não existem no inventário local.`);
+  if (preview.missingLinks > 0) notes.push(`${preview.missingLinks} arquivo(s) solicitado(s) não têm link capturado e ficarão fora do lote.`);
+  if (preview.unknownSizes > 0) notes.push(`O volume exibido é parcial: ${preview.unknownSizes} arquivo(s) não têm tamanho conhecido.`);
+  if (preview.unknownPages > 0) notes.push(`${preview.unknownPages} edição(ões) não têm número de páginas conhecido.`);
+  if (notes.length === 0) notes.push('Todos os arquivos selecionados têm link e metadados de tamanho disponíveis.');
+  elements.batchPreviewNote.textContent = notes.join(' ');
+  elements.batchPreviewPanel.hidden = false;
+}
+
+async function previewBatch(): Promise<void> {
+  clearBatchMessages();
+  batchBusy = true;
+  currentBatchPreview = null;
+  elements.batchPreviewPanel.hidden = true;
+  syncControls();
+
+  try {
+    const filter = collectBatchFilter();
+    const result = await send('PREVIEW_DOWNLOAD_BATCH', { filter });
+    if (!result?.ok || !result.preview) throw new Error(result?.reason ?? 'Não foi possível calcular a prévia do lote.');
+    currentBatchPreview = result.preview as DownloadBatchPreview;
+    renderBatchPreview(currentBatchPreview);
+  } catch (error) {
+    elements.batchErrorBox.hidden = false;
+    elements.batchErrorBox.textContent = error instanceof Error ? error.message : String(error);
+  } finally {
+    batchBusy = false;
+    syncControls();
+  }
+}
+
+async function createBatch(): Promise<void> {
+  if (!currentBatchPreview) return;
+  clearBatchMessages();
+  batchBusy = true;
+  syncControls();
+
+  try {
+    const filter = collectBatchFilter();
+    const result = await send('CREATE_DOWNLOAD_BATCH', { filter });
+    if (!result?.ok || !result.created) throw new Error(result?.reason ?? 'Não foi possível criar o lote.');
+    const created = result.created as DownloadBatchCreated;
+    currentBatchPreview = null;
+    elements.createBatchButton.disabled = true;
+    elements.batchSuccessBox.hidden = false;
+    elements.batchSuccessBox.textContent = `Lote #${created.batchId} criado com ${created.items.toLocaleString('pt-BR')} arquivo(s). Nenhum download foi iniciado.`;
+  } catch (error) {
+    elements.batchErrorBox.hidden = false;
+    elements.batchErrorBox.textContent = error instanceof Error ? error.message : String(error);
+  } finally {
+    batchBusy = false;
+    syncControls();
+  }
+}
+
 elements.inventoryTabButton.addEventListener('click', () => activateTab('inventory'));
 elements.downloadsTabButton.addEventListener('click', () => activateTab('downloads'));
+elements.batchTabButton.addEventListener('click', () => activateTab('batch'));
 elements.syncButton.addEventListener('click', () => void startInventory());
 elements.exportSqliteButton.addEventListener('click', () => void exportSqlite());
 elements.cancelButton.addEventListener('click', () => void send('CANCEL_SYNC'));
 elements.capturePendingButton.addEventListener('click', () => void startCapture('pending'));
 elements.captureAllButton.addEventListener('click', () => void startCapture('all'));
 elements.cancelCaptureButton.addEventListener('click', () => void send('CANCEL_DOWNLOAD_CAPTURE'));
+elements.previewBatchButton.addEventListener('click', () => void previewBatch());
+elements.createBatchButton.addEventListener('click', () => void createBatch());
+
+elements.batchCriterionSelect.addEventListener('change', () => {
+  updateBatchCriterionFields();
+  invalidateBatchPreview();
+});
+for (const element of [
+  elements.batchStartDate,
+  elements.batchEndDate,
+  elements.batchIdsInput,
+  elements.batchFileTypeSelect
+]) {
+  element.addEventListener('input', invalidateBatchPreview);
+  element.addEventListener('change', invalidateBatchPreview);
+}
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== 'local') return;
@@ -281,6 +445,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   }
 });
 
+updateBatchCriterionFields();
 void chrome.storage.local.get([INVENTORY_STATUS_KEY, DOWNLOAD_STATUS_KEY]).then((result) => {
   renderInventory((result[INVENTORY_STATUS_KEY] as SyncStatus | undefined) ?? EMPTY_STATUS);
   renderDownload((result[DOWNLOAD_STATUS_KEY] as DownloadCaptureStatus | undefined) ?? EMPTY_DOWNLOAD_STATUS);

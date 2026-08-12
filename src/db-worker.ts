@@ -1,7 +1,16 @@
 /// <reference lib="webworker" />
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
+import {
+  buildDownloadItemPath,
+  normalizeDownloadBatchFilter,
+  requestedItemTypes
+} from './download-batches';
 import type {
   DbResponse,
+  DownloadBatchCreated,
+  DownloadBatchFilter,
+  DownloadBatchItemType,
+  DownloadBatchPreview,
   DownloadCaptureMode,
   DownloadCaptureStats,
   DownloadCaptureTarget,
@@ -9,7 +18,7 @@ import type {
 } from './types';
 
 const DB_NAME = '/download-edicoes-doe.sqlite3';
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 let sqlite3Promise: Promise<any> | null = null;
 let dbPromise: Promise<any> | null = null;
 
@@ -63,6 +72,72 @@ CREATE TABLE IF NOT EXISTS sincronizacoes (
 );
 `;
 
+const DOWNLOAD_TABLES = `
+CREATE TABLE IF NOT EXISTS download_lotes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  criado_em TEXT NOT NULL,
+  iniciado_em TEXT,
+  concluido_em TEXT,
+  nome TEXT,
+  criterio_tipo TEXT NOT NULL,
+  criterio_valor TEXT,
+  data_inicio TEXT,
+  data_fim TEXT,
+  tipos_arquivo TEXT NOT NULL,
+  destino_descritivo TEXT,
+  total_itens INTEGER NOT NULL DEFAULT 0,
+  itens_concluidos INTEGER NOT NULL DEFAULT 0,
+  itens_falhos INTEGER NOT NULL DEFAULT 0,
+  bytes_previstos INTEGER,
+  bytes_conhecidos INTEGER NOT NULL DEFAULT 0,
+  bytes_concluidos INTEGER NOT NULL DEFAULT 0,
+  links_ausentes INTEGER NOT NULL DEFAULT 0,
+  tamanhos_desconhecidos INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL,
+  erro TEXT
+);
+
+CREATE TABLE IF NOT EXISTS download_itens (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lote_id INTEGER NOT NULL,
+  egbanet_id INTEGER NOT NULL,
+  tipo_arquivo TEXT NOT NULL,
+  url TEXT NOT NULL,
+  bytes_esperados INTEGER,
+  nome_arquivo TEXT NOT NULL,
+  caminho_relativo TEXT,
+  chrome_download_id INTEGER,
+  tentativas INTEGER NOT NULL DEFAULT 0,
+  iniciado_em TEXT,
+  concluido_em TEXT,
+  status TEXT NOT NULL,
+  erro TEXT,
+  FOREIGN KEY (lote_id) REFERENCES download_lotes(id) ON DELETE CASCADE,
+  FOREIGN KEY (egbanet_id) REFERENCES edicoes(egbanet_id),
+  UNIQUE(lote_id, egbanet_id, tipo_arquivo)
+);
+`;
+
+const DOWNLOAD_INDEXES = `
+CREATE INDEX IF NOT EXISTS idx_download_lotes_status_criado
+  ON download_lotes(status, criado_em DESC);
+CREATE INDEX IF NOT EXISTS idx_download_itens_lote_status
+  ON download_itens(lote_id, status);
+CREATE INDEX IF NOT EXISTS idx_download_itens_edicao
+  ON download_itens(egbanet_id);
+`;
+
+interface BatchEditionRow {
+  egbanetId: number;
+  dataEdicao: string;
+  numeroEdicao: number;
+  numeroPaginas: number | null;
+  normalUrl: string | null;
+  normalBytes: number | null;
+  signedUrl: string | null;
+  signedBytes: number | null;
+}
+
 function editionsTableExists(db: any): boolean {
   return Number(db.selectValue(
     "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='edicoes'"
@@ -70,8 +145,7 @@ function editionsTableExists(db: any): boolean {
 }
 
 function migrateLegacyToV5(db: any): void {
-  db.exec('BEGIN IMMEDIATE');
-  try {
+  db.transaction(() => {
     db.exec(`
       DROP INDEX IF EXISTS idx_edicoes_data;
       DROP INDEX IF EXISTS idx_edicoes_numero;
@@ -103,18 +177,13 @@ function migrateLegacyToV5(db: any): void {
 
       DROP TABLE edicoes_legacy;
       ${EDITIONS_INDEXES}
-      PRAGMA user_version=${SCHEMA_VERSION};
+      PRAGMA user_version=5;
     `);
-    db.exec('COMMIT');
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
+  });
 }
 
 function migrateV3ToV5(db: any): void {
-  db.exec('BEGIN IMMEDIATE');
-  try {
+  db.transaction(() => {
     db.exec(`
       ALTER TABLE edicoes ADD COLUMN download_assinado_url TEXT;
       ALTER TABLE edicoes ADD COLUMN download_assinado_bytes INTEGER;
@@ -122,40 +191,41 @@ function migrateV3ToV5(db: any): void {
       ALTER TABLE edicoes ADD COLUMN download_diario_bytes INTEGER;
       ALTER TABLE edicoes ADD COLUMN download_links_capturados_em TEXT;
       ${EDITIONS_INDEXES}
-      PRAGMA user_version=${SCHEMA_VERSION};
+      PRAGMA user_version=5;
     `);
-    db.exec('COMMIT');
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
+  });
 }
 
 function migrateV4ToV5(db: any): void {
-  db.exec('BEGIN IMMEDIATE');
-  try {
+  db.transaction(() => {
     db.exec(`
       ALTER TABLE edicoes ADD COLUMN download_assinado_bytes INTEGER;
       ALTER TABLE edicoes ADD COLUMN download_diario_bytes INTEGER;
       ${EDITIONS_INDEXES}
-      PRAGMA user_version=${SCHEMA_VERSION};
+      PRAGMA user_version=5;
     `);
-    db.exec('COMMIT');
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
+  });
+}
+
+function migrateV5ToV6(db: any): void {
+  db.transaction(() => {
+    db.exec(`${DOWNLOAD_TABLES}${DOWNLOAD_INDEXES}PRAGMA user_version=${SCHEMA_VERSION};`);
+  });
 }
 
 function initializeSchema(db: any): void {
   db.exec('PRAGMA foreign_keys=ON;');
 
   if (!editionsTableExists(db)) {
-    db.exec(`${EDITIONS_TABLE}${EDITIONS_INDEXES}${SYNC_TABLE}PRAGMA user_version=${SCHEMA_VERSION};`);
+    db.exec(`${EDITIONS_TABLE}${EDITIONS_INDEXES}${SYNC_TABLE}${DOWNLOAD_TABLES}${DOWNLOAD_INDEXES}PRAGMA user_version=${SCHEMA_VERSION};`);
     return;
   }
 
-  const version = Number(db.selectValue('PRAGMA user_version'));
+  let version = Number(db.selectValue('PRAGMA user_version'));
+  if (version > SCHEMA_VERSION) {
+    throw new Error(`Banco SQLite usa schema v${version}, superior ao suportado v${SCHEMA_VERSION}.`);
+  }
+
   if (version < 3) {
     migrateLegacyToV5(db);
   } else if (version === 3) {
@@ -164,7 +234,10 @@ function initializeSchema(db: any): void {
     migrateV4ToV5(db);
   }
 
-  db.exec(`${EDITIONS_INDEXES}${SYNC_TABLE}`);
+  version = Number(db.selectValue('PRAGMA user_version'));
+  if (version === 5) migrateV5ToV6(db);
+
+  db.exec(`${EDITIONS_INDEXES}${SYNC_TABLE}${DOWNLOAD_TABLES}${DOWNLOAD_INDEXES}`);
 }
 
 async function getSqlite3(): Promise<any> {
@@ -243,8 +316,7 @@ async function upsertBatch(editions: EditionRecord[]): Promise<{ inserted: numbe
       ultima_coleta_em=excluded.ultima_coleta_em
   `;
 
-  db.exec('BEGIN IMMEDIATE');
-  try {
+  db.transaction(() => {
     for (const edition of editions) {
       db.exec({
         sql,
@@ -268,11 +340,7 @@ async function upsertBatch(editions: EditionRecord[]): Promise<{ inserted: numbe
         ]
       });
     }
-    db.exec('COMMIT');
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
+  });
 
   const updated = editions.filter((edition) => existing.has(edition.egbanetId)).length;
   const inserted = editions.length - updated;
@@ -350,6 +418,172 @@ async function saveDownloadLinks(payload: {
   });
 }
 
+function queryBatchEditions(db: any, input: DownloadBatchFilter): { filter: DownloadBatchFilter; rows: BatchEditionRow[] } {
+  const filter = normalizeDownloadBatchFilter(input);
+  const rows: BatchEditionRow[] = [];
+  let sql = `
+    SELECT egbanet_id, data_edicao, numero_edicao, numero_paginas,
+           download_diario_url, download_diario_bytes,
+           download_assinado_url, download_assinado_bytes
+    FROM edicoes
+  `;
+  let bind: unknown[] = [];
+
+  if (filter.criterion === 'period') {
+    sql += ' WHERE data_edicao BETWEEN ? AND ?';
+    bind = [filter.startDate, filter.endDate];
+  } else {
+    const ids = filter.egbanetIds ?? [];
+    const placeholders = ids.map(() => '?').join(',');
+    sql += ` WHERE egbanet_id IN (${placeholders})`;
+    bind = ids;
+  }
+
+  sql += ' ORDER BY data_edicao ASC, egbanet_id ASC';
+  db.exec({
+    sql,
+    bind,
+    rowMode: 'array',
+    callback: (row: unknown[]) => rows.push({
+      egbanetId: Number(row[0]),
+      dataEdicao: String(row[1]),
+      numeroEdicao: Number(row[2]),
+      numeroPaginas: row[3] === null ? null : Number(row[3]),
+      normalUrl: row[4] === null ? null : String(row[4]),
+      normalBytes: row[5] === null ? null : Number(row[5]),
+      signedUrl: row[6] === null ? null : String(row[6]),
+      signedBytes: row[7] === null ? null : Number(row[7])
+    })
+  });
+
+  return { filter, rows };
+}
+
+function buildBatchPreview(filter: DownloadBatchFilter, rows: BatchEditionRow[]): DownloadBatchPreview {
+  const types = requestedItemTypes(filter.fileType);
+  const preview: DownloadBatchPreview = {
+    editions: rows.length,
+    requestedFiles: rows.length * types.length,
+    availableFiles: 0,
+    normalFiles: 0,
+    signedFiles: 0,
+    missingLinks: 0,
+    missingEditions: filter.criterion === 'egbanet_ids'
+      ? Math.max(0, (filter.egbanetIds?.length ?? 0) - rows.length)
+      : 0,
+    pages: 0,
+    unknownPages: 0,
+    knownBytes: 0,
+    unknownSizes: 0
+  };
+
+  for (const row of rows) {
+    if (row.numeroPaginas === null) preview.unknownPages += 1;
+    else preview.pages += row.numeroPaginas;
+
+    for (const type of types) {
+      const url = type === 'normal' ? row.normalUrl : row.signedUrl;
+      const bytes = type === 'normal' ? row.normalBytes : row.signedBytes;
+      if (!url) {
+        preview.missingLinks += 1;
+        continue;
+      }
+      preview.availableFiles += 1;
+      if (type === 'normal') preview.normalFiles += 1;
+      else preview.signedFiles += 1;
+      if (bytes === null) preview.unknownSizes += 1;
+      else preview.knownBytes += bytes;
+    }
+  }
+
+  return preview;
+}
+
+async function previewDownloadBatch(input: DownloadBatchFilter): Promise<DownloadBatchPreview> {
+  const db = await getDb();
+  const { filter, rows } = queryBatchEditions(db, input);
+  return buildBatchPreview(filter, rows);
+}
+
+function itemSource(row: BatchEditionRow, type: DownloadBatchItemType): { url: string | null; bytes: number | null } {
+  return type === 'normal'
+    ? { url: row.normalUrl, bytes: row.normalBytes }
+    : { url: row.signedUrl, bytes: row.signedBytes };
+}
+
+async function createDownloadBatch(input: DownloadBatchFilter): Promise<DownloadBatchCreated> {
+  const db = await getDb();
+  return db.transaction(() => {
+    const { filter, rows } = queryBatchEditions(db, input);
+    const preview = buildBatchPreview(filter, rows);
+    if (preview.editions === 0) throw new Error('Nenhuma edição corresponde ao filtro informado.');
+    if (preview.availableFiles === 0) throw new Error('Nenhum arquivo disponível para o tipo solicitado. Capture os links antes de criar o lote.');
+
+    const createdAt = new Date().toISOString();
+    const batchName = filter.name ?? `Lote ${createdAt.slice(0, 16).replace('T', ' ')}`;
+    const criterionValue = filter.criterion === 'egbanet_ids'
+      ? JSON.stringify(filter.egbanetIds ?? [])
+      : null;
+    const predictedBytes = preview.unknownSizes === 0 ? preview.knownBytes : null;
+
+    db.exec({
+      sql: `
+        INSERT INTO download_lotes (
+          criado_em, nome, criterio_tipo, criterio_valor, data_inicio, data_fim,
+          tipos_arquivo, total_itens, bytes_previstos, bytes_conhecidos,
+          links_ausentes, tamanhos_desconhecidos, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      bind: [
+        createdAt,
+        batchName,
+        filter.criterion,
+        criterionValue,
+        filter.startDate ?? null,
+        filter.endDate ?? null,
+        filter.fileType,
+        preview.availableFiles,
+        predictedBytes,
+        preview.knownBytes,
+        preview.missingLinks,
+        preview.unknownSizes,
+        'queued'
+      ]
+    });
+    const batchId = Number(db.selectValue('SELECT last_insert_rowid()'));
+
+    const insertItemSql = `
+      INSERT INTO download_itens (
+        lote_id, egbanet_id, tipo_arquivo, url, bytes_esperados,
+        nome_arquivo, caminho_relativo, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    for (const row of rows) {
+      for (const type of requestedItemTypes(filter.fileType)) {
+        const source = itemSource(row, type);
+        if (!source.url) continue;
+        const path = buildDownloadItemPath(row.dataEdicao, row.numeroEdicao, row.egbanetId, type);
+        db.exec({
+          sql: insertItemSql,
+          bind: [
+            batchId,
+            row.egbanetId,
+            type,
+            source.url,
+            source.bytes,
+            path.filename,
+            path.relativePath,
+            'queued'
+          ]
+        });
+      }
+    }
+
+    return { batchId, items: preview.availableFiles, preview };
+  });
+}
+
 async function exportDatabase(): Promise<Uint8Array> {
   const db = await getDb();
   const sqlite3 = await getSqlite3();
@@ -373,6 +607,8 @@ async function handle(action: string, payload: any): Promise<unknown> {
     case 'downloadCaptureStats': return downloadCaptureStats();
     case 'listDownloadCaptureTargets': return listDownloadCaptureTargets(payload.mode);
     case 'saveDownloadLinks': return saveDownloadLinks(payload);
+    case 'previewDownloadBatch': return previewDownloadBatch(payload.filter);
+    case 'createDownloadBatch': return createDownloadBatch(payload.filter);
     case 'exportDatabase': return exportDatabase();
     default: throw new Error(`Ação SQLite desconhecida: ${action}`);
   }

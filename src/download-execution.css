@@ -1,0 +1,34 @@
+.batch-execution {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 13px;
+  border: 1px solid #d7e0e9;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.batch-execution-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.batch-execution-header strong {
+  display: block;
+  color: #243b53;
+  font-size: 13px;
+}
+
+.batch-execution .progress-track {
+  margin-top: 2px;
+}
+
+.batch-execution .helper-text {
+  margin-top: 0;
+}
+
+.batch-execution .actions {
+  margin-top: 2px;
+}

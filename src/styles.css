@@ -6,8 +6,9 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; min-width: 410px; background: #f5f7fa; }
-button { font: inherit; }
+button, input, select, textarea { font: inherit; }
 code { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; }
 
 .app-shell { padding: 18px; }
@@ -18,6 +19,7 @@ h1 { margin: 0; font-size: 19px; line-height: 1.2; letter-spacing: -.02em; }
 h2 { margin: 0; font-size: 14px; line-height: 1.3; letter-spacing: -.01em; }
 
 .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 14px; padding: 4px; border: 1px solid #dde3eb; border-radius: 11px; background: #e9edf2; }
+.tabs--three { grid-template-columns: repeat(3, 1fr); }
 .tab-button { min-height: 34px; border: 0; border-radius: 8px; background: transparent; color: #667085; cursor: pointer; font-size: 12px; font-weight: 700; }
 .tab-button.is-active { background: #fff; color: #243b53; box-shadow: 0 1px 2px rgba(16, 24, 40, .08); }
 .tab-panel[hidden] { display: none; }
@@ -31,9 +33,9 @@ h2 { margin: 0; font-size: 14px; line-height: 1.3; letter-spacing: -.01em; }
 .status-badge[data-state="error"] { background: #fdecec; color: #a32121; }
 
 .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.summary-card { padding: 13px; border: 1px solid #e1e6ed; border-radius: 12px; background: #fff; }
+.summary-card { min-width: 0; padding: 13px; border: 1px solid #e1e6ed; border-radius: 12px; background: #fff; }
 .summary-label { display: block; color: #667085; font-size: 11px; margin-bottom: 6px; }
-.summary-card strong { font-size: 22px; letter-spacing: -.03em; }
+.summary-card strong { display: block; overflow: hidden; font-size: 22px; letter-spacing: -.03em; text-overflow: ellipsis; white-space: nowrap; }
 
 .progress-panel { margin: 12px 0; padding: 13px; border-radius: 12px; background: #fff; border: 1px solid #e1e6ed; }
 .progress-track { height: 5px; overflow: hidden; border-radius: 999px; background: #edf1f5; }
@@ -47,8 +49,30 @@ h2 { margin: 0; font-size: 14px; line-height: 1.3; letter-spacing: -.01em; }
 .details span { display: block; color: #667085; font-size: 10px; margin-bottom: 4px; }
 .details strong { display: block; overflow: hidden; color: #344054; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 
+.batch-form { display: grid; gap: 10px; padding: 13px; border: 1px solid #e1e6ed; border-radius: 12px; background: #fff; }
+.form-grid { display: grid; gap: 9px; }
+.form-grid--two { grid-template-columns: 1fr 1fr; }
+.form-field { display: grid; min-width: 0; gap: 5px; color: #344054; font-size: 11px; font-weight: 650; }
+.form-field > span { color: #475467; }
+.form-field input,
+.form-field select,
+.form-field textarea { width: 100%; min-width: 0; border: 1px solid #cfd6df; border-radius: 8px; background: #fff; color: #172033; outline: none; }
+.form-field input,
+.form-field select { min-height: 35px; padding: 0 9px; }
+.form-field textarea { padding: 8px 9px; line-height: 1.4; resize: vertical; }
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus { border-color: #6d8daf; box-shadow: 0 0 0 2px rgba(49, 91, 138, .12); }
+.form-field small { color: #667085; font-size: 9.5px; font-weight: 500; line-height: 1.4; }
+.batch-preview { display: grid; gap: 10px; margin-top: 12px; }
+.batch-preview-details { margin-top: 0; }
+.batch-preview .summary-card strong { font-size: 18px; }
+
 .helper-text { margin: 11px 0 0; color: #667085; font-size: 10.5px; line-height: 1.5; }
-.error-box { margin: 12px 0 0; padding: 10px 11px; border: 1px solid #f0caca; border-radius: 10px; background: #fff1f1; color: #8f1d1d; font-size: 11px; line-height: 1.45; }
+.error-box,
+.success-box { margin: 12px 0 0; padding: 10px 11px; border-radius: 10px; font-size: 11px; line-height: 1.45; }
+.error-box { border: 1px solid #f0caca; background: #fff1f1; color: #8f1d1d; }
+.success-box { border: 1px solid #bfdfc9; background: #eef9f1; color: #176b3a; }
 .actions { display: flex; gap: 8px; margin-top: 14px; }
 .actions--wrap { flex-wrap: wrap; }
 .actions button { min-height: 36px; border-radius: 9px; padding: 0 13px; cursor: pointer; font-weight: 700; font-size: 12px; }

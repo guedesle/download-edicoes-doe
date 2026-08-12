@@ -1,5 +1,8 @@
 export type SyncState = 'idle' | 'running' | 'completed' | 'cancelled' | 'error';
 export type DownloadCaptureMode = 'pending' | 'all';
+export type DownloadBatchCriterion = 'period' | 'egbanet_ids';
+export type DownloadBatchFileType = 'normal' | 'signed' | 'both';
+export type DownloadBatchItemType = 'normal' | 'signed';
 
 export interface EditionRecord {
   egbanetId: number;
@@ -71,6 +74,35 @@ export interface DownloadCaptureStats {
   diaryLinks: number;
   signedSizes: number;
   diarySizes: number;
+}
+
+export interface DownloadBatchFilter {
+  criterion: DownloadBatchCriterion;
+  fileType: DownloadBatchFileType;
+  startDate?: string;
+  endDate?: string;
+  egbanetIds?: number[];
+  name?: string;
+}
+
+export interface DownloadBatchPreview {
+  editions: number;
+  requestedFiles: number;
+  availableFiles: number;
+  normalFiles: number;
+  signedFiles: number;
+  missingLinks: number;
+  missingEditions: number;
+  pages: number;
+  unknownPages: number;
+  knownBytes: number;
+  unknownSizes: number;
+}
+
+export interface DownloadBatchCreated {
+  batchId: number;
+  items: number;
+  preview: DownloadBatchPreview;
 }
 
 export interface DbResponse<T = unknown> {

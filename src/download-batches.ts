@@ -71,16 +71,21 @@ export function buildDownloadItemPath(
   dataEdicao: string,
   numeroEdicao: number,
   egbanetId: number,
-  type: DownloadBatchItemType
+  type: DownloadBatchItemType,
+  supplementNumber: number | null = null
 ): { filename: string; relativePath: string } {
   assertIsoDate(dataEdicao, 'Data da edição');
   if (!Number.isSafeInteger(numeroEdicao) || numeroEdicao < 0) throw new Error('Número da edição inválido.');
   if (!Number.isSafeInteger(egbanetId) || egbanetId <= 0) throw new Error('ID EGBANET inválido.');
+  if (supplementNumber !== null && (!Number.isSafeInteger(supplementNumber) || supplementNumber <= 0)) {
+    throw new Error('Número do suplemento inválido.');
+  }
 
   const year = dataEdicao.slice(0, 4);
   const month = dataEdicao.slice(5, 7);
   const typeLabel = type === 'normal' ? 'NORMAL' : 'ASSINADO';
   const typeFolder = type === 'normal' ? 'normal' : 'assinado';
-  const filename = `${dataEdicao}-${numeroEdicao}-${typeLabel}.pdf`;
+  const supplementLabel = supplementNumber === null ? '' : `-SUP-${supplementNumber}`;
+  const filename = `${dataEdicao}-${numeroEdicao}${supplementLabel}-${typeLabel}.pdf`;
   return { filename, relativePath: `${year}/${month}/${typeFolder}/${filename}` };
 }

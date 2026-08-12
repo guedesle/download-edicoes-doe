@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assertSqliteHeader,
+  isSupportedSqliteImportSchemaVersion,
   SQLITE_IMPORT_MAX_BYTES,
   validateSqliteImportMetadata
 } from '../src/sqlite-import';
@@ -24,5 +25,12 @@ describe('sqlite import validation', () => {
     const invalid = new Uint8Array(100);
     invalid.set(new TextEncoder().encode('not sqlite'));
     expect(() => assertSqliteHeader(invalid)).toThrow(/cabeçalho SQLite/i);
+  });
+
+  it('aceita schemas v5 e v6 como origem e rejeita outros', () => {
+    expect(isSupportedSqliteImportSchemaVersion(5)).toBe(true);
+    expect(isSupportedSqliteImportSchemaVersion(6)).toBe(true);
+    expect(isSupportedSqliteImportSchemaVersion(4)).toBe(false);
+    expect(isSupportedSqliteImportSchemaVersion(7)).toBe(false);
   });
 });

@@ -2,6 +2,7 @@ export type SyncState = 'idle' | 'running' | 'completed' | 'cancelled' | 'error'
 export type DownloadCaptureMode = 'pending' | 'all';
 export type DownloadBatchCriterion = 'period' | 'egbanet_ids';
 export type DownloadBatchFileType = 'normal' | 'signed' | 'both';
+export type DownloadBatchEditionScope = 'all' | 'regular' | 'supplements';
 export type DownloadBatchItemType = 'normal' | 'signed';
 
 export interface EditionRecord {
@@ -79,6 +80,7 @@ export interface DownloadCaptureStats {
 export interface DownloadBatchFilter {
   criterion: DownloadBatchCriterion;
   fileType: DownloadBatchFileType;
+  editionScope?: DownloadBatchEditionScope;
   startDate?: string;
   endDate?: string;
   egbanetIds?: number[];

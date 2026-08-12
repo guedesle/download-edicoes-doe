@@ -439,19 +439,28 @@ function queryBatchEditions(db: any, input: DownloadBatchFilter): { filter: Down
            END AS suplemento_numero
     FROM edicoes AS e
   `;
-  let bind: unknown[] = [];
+  const conditions: string[] = [];
+  const bind: unknown[] = [];
 
   if (filter.criterion === 'period') {
-    sql += ' WHERE e.data_edicao BETWEEN ? AND ?';
-    bind = [filter.startDate, filter.endDate];
+    conditions.push('e.data_edicao BETWEEN ? AND ?');
+    bind.push(filter.startDate, filter.endDate);
   } else {
     const ids = filter.egbanetIds ?? [];
     const placeholders = ids.map(() => '?').join(',');
-    sql += ` WHERE e.egbanet_id IN (${placeholders})`;
-    bind = ids;
+    conditions.push(`e.egbanet_id IN (${placeholders})`);
+    bind.push(...ids);
   }
 
+  if (filter.editionScope === 'regular') {
+    conditions.push('e.suplemento = 0');
+  } else if (filter.editionScope === 'supplements') {
+    conditions.push('(e.suplemento IS NULL OR e.suplemento <> 0)');
+  }
+
+  if (conditions.length > 0) sql += ` WHERE ${conditions.join(' AND ')}`;
   sql += ' ORDER BY e.data_edicao ASC, e.egbanet_id ASC';
+
   db.exec({
     sql,
     bind,

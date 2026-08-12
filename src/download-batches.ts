@@ -1,4 +1,5 @@
 import type {
+  DownloadBatchEditionScope,
   DownloadBatchFilter,
   DownloadBatchItemType
 } from './types';
@@ -40,6 +41,11 @@ export function normalizeDownloadBatchFilter(input: DownloadBatchFilter): Downlo
     throw new Error('Tipo de arquivo inválido.');
   }
 
+  const editionScope: DownloadBatchEditionScope = input.editionScope ?? 'all';
+  if (!['all', 'regular', 'supplements'].includes(editionScope)) {
+    throw new Error('Tipo de edição inválido.');
+  }
+
   const name = input.name?.trim() || undefined;
 
   if (input.criterion === 'period') {
@@ -48,7 +54,7 @@ export function normalizeDownloadBatchFilter(input: DownloadBatchFilter): Downlo
     assertIsoDate(startDate, 'Data inicial');
     assertIsoDate(endDate, 'Data final');
     if (startDate > endDate) throw new Error('A data inicial não pode ser posterior à data final.');
-    return { criterion: 'period', fileType: input.fileType, startDate, endDate, name };
+    return { criterion: 'period', fileType: input.fileType, editionScope, startDate, endDate, name };
   }
 
   const egbanetIds = [...new Set(input.egbanetIds ?? [])];
@@ -59,7 +65,7 @@ export function normalizeDownloadBatchFilter(input: DownloadBatchFilter): Downlo
   for (const id of egbanetIds) {
     if (!Number.isSafeInteger(id) || id <= 0) throw new Error(`ID EGBANET inválido: ${id}`);
   }
-  return { criterion: 'egbanet_ids', fileType: input.fileType, egbanetIds, name };
+  return { criterion: 'egbanet_ids', fileType: input.fileType, editionScope, egbanetIds, name };
 }
 
 export function requestedItemTypes(fileType: DownloadBatchFilter['fileType']): DownloadBatchItemType[] {

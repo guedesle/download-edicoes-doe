@@ -25,6 +25,7 @@ describe('planejamento de lotes', () => {
     })).toEqual({
       criterion: 'period',
       fileType: 'normal',
+      editionScope: 'all',
       startDate: '2022-01-30',
       endDate: '2022-07-31',
       name: 'Lote histórico'
@@ -38,20 +39,67 @@ describe('planejamento de lotes', () => {
     })).toThrow('data inicial');
   });
 
+  it('usa regulares + suplementos como padrão e aceita os escopos específicos', () => {
+    expect(normalizeDownloadBatchFilter({
+      criterion: 'egbanet_ids',
+      fileType: 'both',
+      egbanetIds: [22178]
+    }).editionScope).toBe('all');
+
+    expect(normalizeDownloadBatchFilter({
+      criterion: 'egbanet_ids',
+      fileType: 'both',
+      editionScope: 'regular',
+      egbanetIds: [22178]
+    }).editionScope).toBe('regular');
+
+    expect(normalizeDownloadBatchFilter({
+      criterion: 'egbanet_ids',
+      fileType: 'both',
+      editionScope: 'supplements',
+      egbanetIds: [22180]
+    }).editionScope).toBe('supplements');
+  });
+
+  it('rejeita tipo de edição inválido', () => {
+    expect(() => normalizeDownloadBatchFilter({
+      criterion: 'egbanet_ids',
+      fileType: 'normal',
+      editionScope: 'outro' as never,
+      egbanetIds: [22178]
+    })).toThrow('Tipo de edição inválido');
+  });
+
   it('expande ambos para normal e assinado', () => {
     expect(requestedItemTypes('both')).toEqual(['normal', 'signed']);
     expect(requestedItemTypes('normal')).toEqual(['normal']);
   });
 
-  it('gera nome com NORMAL ou ASSINADO e separa por subpasta', () => {
+  it('omite NORMAL do arquivo regular e preserva ASSINADO', () => {
     expect(buildDownloadItemPath('2022-07-31', 12345, 21535, 'normal')).toEqual({
-      filename: '2022-07-31-12345-NORMAL.pdf',
-      relativePath: '2022/07/normal/2022-07-31-12345-NORMAL.pdf'
+      filename: '2022-07-31-12345.pdf',
+      relativePath: '2022/07/normal/2022-07-31-12345.pdf'
     });
 
     expect(buildDownloadItemPath('2022-07-31', 12345, 21535, 'signed')).toEqual({
       filename: '2022-07-31-12345-ASSINADO.pdf',
       relativePath: '2022/07/assinado/2022-07-31-12345-ASSINADO.pdf'
     });
+  });
+
+  it('acrescenta SUP-X e omite NORMAL nos suplementos não assinados', () => {
+    expect(buildDownloadItemPath('2026-07-08', 24429, 22180, 'normal', 1)).toEqual({
+      filename: '2026-07-08-24429-SUP-1.pdf',
+      relativePath: '2026/07/normal/2026-07-08-24429-SUP-1.pdf'
+    });
+
+    expect(buildDownloadItemPath('2026-07-08', 24429, 22181, 'signed', 2)).toEqual({
+      filename: '2026-07-08-24429-SUP-2-ASSINADO.pdf',
+      relativePath: '2026/07/assinado/2026-07-08-24429-SUP-2-ASSINADO.pdf'
+    });
+  });
+
+  it('rejeita número de suplemento inválido', () => {
+    expect(() => buildDownloadItemPath('2026-07-08', 24429, 22180, 'normal', 0)).toThrow('Número do suplemento inválido');
   });
 });

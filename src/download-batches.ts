@@ -1,4 +1,5 @@
 import type {
+  DownloadBatchEditionScope,
   DownloadBatchFilter,
   DownloadBatchItemType
 } from './types';
@@ -40,6 +41,11 @@ export function normalizeDownloadBatchFilter(input: DownloadBatchFilter): Downlo
     throw new Error('Tipo de arquivo inválido.');
   }
 
+  const editionScope: DownloadBatchEditionScope = input.editionScope ?? 'all';
+  if (!['all', 'regular', 'supplements'].includes(editionScope)) {
+    throw new Error('Tipo de edição inválido.');
+  }
+
   const name = input.name?.trim() || undefined;
 
   if (input.criterion === 'period') {
@@ -48,7 +54,7 @@ export function normalizeDownloadBatchFilter(input: DownloadBatchFilter): Downlo
     assertIsoDate(startDate, 'Data inicial');
     assertIsoDate(endDate, 'Data final');
     if (startDate > endDate) throw new Error('A data inicial não pode ser posterior à data final.');
-    return { criterion: 'period', fileType: input.fileType, startDate, endDate, name };
+    return { criterion: 'period', fileType: input.fileType, editionScope, startDate, endDate, name };
   }
 
   const egbanetIds = [...new Set(input.egbanetIds ?? [])];
@@ -59,7 +65,7 @@ export function normalizeDownloadBatchFilter(input: DownloadBatchFilter): Downlo
   for (const id of egbanetIds) {
     if (!Number.isSafeInteger(id) || id <= 0) throw new Error(`ID EGBANET inválido: ${id}`);
   }
-  return { criterion: 'egbanet_ids', fileType: input.fileType, egbanetIds, name };
+  return { criterion: 'egbanet_ids', fileType: input.fileType, editionScope, egbanetIds, name };
 }
 
 export function requestedItemTypes(fileType: DownloadBatchFilter['fileType']): DownloadBatchItemType[] {
@@ -71,16 +77,21 @@ export function buildDownloadItemPath(
   dataEdicao: string,
   numeroEdicao: number,
   egbanetId: number,
-  type: DownloadBatchItemType
+  type: DownloadBatchItemType,
+  supplementNumber: number | null = null
 ): { filename: string; relativePath: string } {
   assertIsoDate(dataEdicao, 'Data da edição');
   if (!Number.isSafeInteger(numeroEdicao) || numeroEdicao < 0) throw new Error('Número da edição inválido.');
   if (!Number.isSafeInteger(egbanetId) || egbanetId <= 0) throw new Error('ID EGBANET inválido.');
+  if (supplementNumber !== null && (!Number.isSafeInteger(supplementNumber) || supplementNumber <= 0)) {
+    throw new Error('Número do suplemento inválido.');
+  }
 
   const year = dataEdicao.slice(0, 4);
   const month = dataEdicao.slice(5, 7);
-  const typeLabel = type === 'normal' ? 'NORMAL' : 'ASSINADO';
   const typeFolder = type === 'normal' ? 'normal' : 'assinado';
-  const filename = `${dataEdicao}-${numeroEdicao}-${typeLabel}.pdf`;
+  const supplementLabel = supplementNumber === null ? '' : `-SUP-${supplementNumber}`;
+  const signedLabel = type === 'signed' ? '-ASSINADO' : '';
+  const filename = `${dataEdicao}-${numeroEdicao}${supplementLabel}${signedLabel}.pdf`;
   return { filename, relativePath: `${year}/${month}/${typeFolder}/${filename}` };
 }

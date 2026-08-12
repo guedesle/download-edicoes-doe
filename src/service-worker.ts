@@ -2,6 +2,7 @@ const OFFSCREEN_URL = 'offscreen.html';
 const INVENTORY_STATUS_KEY = 'inventorySyncStatus';
 const DOWNLOAD_STATUS_KEY = 'downloadCaptureStatus';
 const BATCH_DOWNLOAD_STATUS_KEY = 'batchDownloadStatus';
+let databaseImportRunning = false;
 
 function storedState(value: unknown): string | undefined {
   if (!value || typeof value !== 'object') return undefined;
@@ -39,6 +40,7 @@ async function isBatchDownloadRunning(): Promise<boolean> {
 }
 
 async function anotherOperationIsRunning(): Promise<boolean> {
+  if (databaseImportRunning) return true;
   const result = await chrome.storage.local.get([INVENTORY_STATUS_KEY, DOWNLOAD_STATUS_KEY, BATCH_DOWNLOAD_STATUS_KEY]);
   return storedState(result[INVENTORY_STATUS_KEY]) === 'running'
     || storedState(result[DOWNLOAD_STATUS_KEY]) === 'running'
@@ -46,7 +48,7 @@ async function anotherOperationIsRunning(): Promise<boolean> {
 }
 
 async function exportSqlite(): Promise<{ ok: boolean; downloadId?: number; bytes?: number; reason?: string }> {
-  if (await isBatchDownloadRunning()) return { ok: false, reason: 'Já existe um lote de downloads em execução.' };
+  if (await anotherOperationIsRunning()) return { ok: false, reason: 'Já existe uma operação em andamento.' };
   await ensureOffscreenDocument();
   const prepared = await chrome.runtime.sendMessage({
     target: 'offscreen',
@@ -114,13 +116,24 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     'PREVIEW_DOWNLOAD_BATCH',
     'CREATE_DOWNLOAD_BATCH',
     'START_BATCH_DOWNLOAD',
-    'CANCEL_BATCH_DOWNLOAD'
+    'CANCEL_BATCH_DOWNLOAD',
+    'IMPORT_SQLITE'
   ]);
 
   if (forwardedTypes.has(message.type)) {
     void (async () => {
+      const importing = message.type === 'IMPORT_SQLITE';
       try {
-        if (message.type === 'START_BATCH_DOWNLOAD') {
+        if (importing) {
+          if (await anotherOperationIsRunning()) {
+            sendResponse({ ok: false, reason: 'Já existe uma operação em andamento.' });
+            return;
+          }
+          databaseImportRunning = true;
+        } else if (databaseImportRunning) {
+          sendResponse({ ok: false, reason: 'Importação do SQLite em andamento.' });
+          return;
+        } else if (message.type === 'START_BATCH_DOWNLOAD') {
           if (await anotherOperationIsRunning()) {
             sendResponse({ ok: false, reason: 'operation-running' });
             return;
@@ -141,6 +154,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           ok: false,
           reason: error instanceof Error ? error.message : String(error)
         });
+      } finally {
+        if (importing) databaseImportRunning = false;
       }
     })();
     return true;

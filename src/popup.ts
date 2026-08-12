@@ -2,6 +2,7 @@ import './styles.css';
 import { parseEgbanetIdList } from './download-batches';
 import type {
   DownloadBatchCreated,
+  DownloadBatchEditionScope,
   DownloadBatchFileType,
   DownloadBatchFilter,
   DownloadBatchPreview,
@@ -59,6 +60,7 @@ const elements = {
   batchStartDate: document.querySelector<HTMLInputElement>('#batchStartDate')!,
   batchEndDate: document.querySelector<HTMLInputElement>('#batchEndDate')!,
   batchIdsInput: document.querySelector<HTMLTextAreaElement>('#batchIdsInput')!,
+  batchEditionScopeSelect: document.querySelector<HTMLSelectElement>('#batchEditionScopeSelect')!,
   batchFileTypeSelect: document.querySelector<HTMLSelectElement>('#batchFileTypeSelect')!,
   batchNameInput: document.querySelector<HTMLInputElement>('#batchNameInput')!,
   batchErrorBox: document.querySelector<HTMLElement>('#batchErrorBox')!,
@@ -326,6 +328,7 @@ function invalidateBatchPreview(): void {
 function collectBatchFilter(): DownloadBatchFilter {
   const criterion = elements.batchCriterionSelect.value === 'egbanet_ids' ? 'egbanet_ids' : 'period';
   const fileType = elements.batchFileTypeSelect.value as DownloadBatchFileType;
+  const editionScope = elements.batchEditionScopeSelect.value as DownloadBatchEditionScope;
   const name = elements.batchNameInput.value.trim() || undefined;
 
   if (criterion === 'period') {
@@ -333,12 +336,12 @@ function collectBatchFilter(): DownloadBatchFilter {
     const endDate = elements.batchEndDate.value;
     if (!startDate || !endDate) throw new Error('Informe a data inicial e a data final.');
     if (startDate > endDate) throw new Error('A data inicial não pode ser posterior à data final.');
-    return { criterion, fileType, startDate, endDate, name };
+    return { criterion, fileType, editionScope, startDate, endDate, name };
   }
 
   const egbanetIds = parseEgbanetIdList(elements.batchIdsInput.value);
   if (egbanetIds.length === 0) throw new Error('Informe ao menos um ID EGBANET.');
-  return { criterion, fileType, egbanetIds, name };
+  return { criterion, fileType, editionScope, egbanetIds, name };
 }
 
 function renderBatchPreview(preview: DownloadBatchPreview): void {
@@ -352,7 +355,7 @@ function renderBatchPreview(preview: DownloadBatchPreview): void {
   elements.batchPreviewUnknownSizes.textContent = preview.unknownSizes.toLocaleString('pt-BR');
 
   const notes: string[] = [];
-  if (preview.missingEditions > 0) notes.push(`${preview.missingEditions} ID(s) não existem no inventário local.`);
+  if (preview.missingEditions > 0) notes.push(`${preview.missingEditions} ID(s) não entram no lote porque estão ausentes ou fora do tipo de edição selecionado.`);
   if (preview.missingLinks > 0) notes.push(`${preview.missingLinks} arquivo(s) solicitado(s) não têm link capturado e ficarão fora do lote.`);
   if (preview.unknownSizes > 0) notes.push(`O volume exibido é parcial: ${preview.unknownSizes} arquivo(s) não têm tamanho conhecido.`);
   if (preview.unknownPages > 0) notes.push(`${preview.unknownPages} edição(ões) não têm número de páginas conhecido.`);
@@ -427,6 +430,7 @@ for (const element of [
   elements.batchStartDate,
   elements.batchEndDate,
   elements.batchIdsInput,
+  elements.batchEditionScopeSelect,
   elements.batchFileTypeSelect
 ]) {
   element.addEventListener('input', invalidateBatchPreview);

@@ -57,8 +57,11 @@
         <footer class="actions actions--wrap">
           <button id="syncButton" class="primary-button" type="button">Sincronizar edições</button>
           <button id="exportSqliteButton" class="secondary-button" type="button">Exportar SQLite</button>
+          <button id="importSqliteButton" class="secondary-button" type="button">Importar SQLite</button>
+          <input id="importSqliteInput" type="file" accept=".sqlite3,application/x-sqlite3" hidden />
           <button id="cancelButton" class="secondary-button" type="button" hidden>Cancelar</button>
         </footer>
+        <p id="importSqliteStatus" class="helper-text" aria-live="polite">A importação aceita somente bancos SQLite da própria extensão com schema compatível.</p>
       </section>
 
       <section id="downloadsPanel" class="tab-panel" role="tabpanel" aria-labelledby="downloadsTabButton" hidden>
@@ -138,6 +141,16 @@
             <small>Separe IDs por vírgula, espaço ou nova linha. Máximo de 500.</small>
           </label>
 
+          <label class="form-field">
+            <span>Tipo de edição</span>
+            <select id="batchEditionScopeSelect">
+              <option value="all" selected>Regulares + suplementos (padrão)</option>
+              <option value="regular">Somente edições regulares</option>
+              <option value="supplements">Somente suplementos</option>
+            </select>
+            <small>Suplementos legados com valor vazio também entram em “Somente suplementos”.</small>
+          </label>
+
           <div class="form-grid form-grid--two">
             <label class="form-field">
               <span>Arquivos</span>
@@ -197,6 +210,7 @@
     </main>
     <script type="module" src="/src/version.ts"></script>
     <script type="module" src="/src/popup.ts"></script>
+    <script type="module" src="/src/sqlite-import-ui.ts"></script>
     <script type="module" src="/src/destination-ui.ts"></script>
     <script type="module" src="/src/download-execution-ui.ts"></script>
   </body>

@@ -91,6 +91,11 @@ describe('parser EGBANET', () => {
     });
   });
 
+  it('interpreta marcador ordinal como suplemento', () => {
+    const supplementHtml = html.replace('<td>Não</td><td>80</td>', '<td>1º</td><td>80</td>');
+    expect(parseEditionPage(supplementHtml, 1).editions[0].suplemento).toBe(true);
+  });
+
   it('usa o padrão conhecido como fallback quando o link Editar não está presente', () => {
     const withoutEdit = html.replace('<a title="Editar" href="/admin/edicoes/edit/22349">editar</a>', '');
     expect(parseEditionPage(withoutEdit, 1).editions[0].editUrl).toBe('/admin/edicoes/edit/22349');

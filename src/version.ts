@@ -1,3 +1,5 @@
+import './query-mount';
+
 const manifest = chrome.runtime.getManifest();
 const displayVersion = manifest.version_name || manifest.version;
 const versionElement = document.querySelector<HTMLElement>('#appVersion');

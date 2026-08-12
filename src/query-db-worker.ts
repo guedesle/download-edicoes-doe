@@ -11,7 +11,7 @@ interface EditionQueryRow {
   editionType: string;
   date: string;
   editionNumber: number;
-  supplement: boolean | null;
+  supplement: boolean;
   pages: number | null;
   normalUrl: string | null;
   normalBytes: number | null;
@@ -60,6 +60,31 @@ async function queryOptions(): Promise<{ editionTypes: string[] }> {
   });
   return { editionTypes };
 }
+
+function mapEditionRow(row: unknown[]): EditionQueryRow {
+  return {
+    egbanetId: Number(row[0]),
+    editionType: String(row[1]),
+    date: String(row[2]),
+    editionNumber: Number(row[3]),
+    supplement: Number(row[4]) === 1,
+    pages: row[5] === null ? null : Number(row[5]),
+    normalUrl: row[6] === null ? null : String(row[6]),
+    normalBytes: row[7] === null ? null : Number(row[7]),
+    signedUrl: row[8] === null ? null : String(row[8]),
+    signedBytes: row[9] === null ? null : Number(row[9])
+  };
+}
+
+const ROW_SELECT = `
+  SELECT
+    egbanet_id, tipo_edicao, data_edicao, numero_edicao,
+    CASE WHEN suplemento = 0 THEN 0 ELSE 1 END AS suplemento_efetivo,
+    numero_paginas,
+    download_diario_url, download_diario_bytes,
+    download_assinado_url, download_assinado_bytes
+  FROM edicoes
+`;
 
 async function queryEditions(input: EditionQueryFilter): Promise<{
   page: number;
@@ -116,40 +141,39 @@ async function queryEditions(input: EditionQueryFilter): Promise<{
   const rows: EditionQueryRow[] = [];
 
   db.exec({
-    sql: `
-      SELECT
-        egbanet_id, tipo_edicao, data_edicao, numero_edicao,
-        CASE WHEN suplemento = 0 THEN 0 ELSE 1 END AS suplemento_efetivo,
-        numero_paginas,
-        download_diario_url, download_diario_bytes,
-        download_assinado_url, download_assinado_bytes
-      FROM edicoes
+    sql: `${ROW_SELECT}
       ${whereSql}
       ORDER BY data_edicao DESC, numero_edicao DESC, egbanet_id DESC
-      LIMIT ? OFFSET ?
-    `,
+      LIMIT ? OFFSET ?`,
     bind: [...bind, filter.pageSize, offset],
     rowMode: 'array',
-    callback: (row: unknown[]) => rows.push({
-      egbanetId: Number(row[0]),
-      editionType: String(row[1]),
-      date: String(row[2]),
-      editionNumber: Number(row[3]),
-      supplement: Number(row[4]) === 1,
-      pages: row[5] === null ? null : Number(row[5]),
-      normalUrl: row[6] === null ? null : String(row[6]),
-      normalBytes: row[7] === null ? null : Number(row[7]),
-      signedUrl: row[8] === null ? null : String(row[8]),
-      signedBytes: row[9] === null ? null : Number(row[9])
-    })
+    callback: (row: unknown[]) => rows.push(mapEditionRow(row))
   });
 
   return { page, pageSize: filter.pageSize, totalPages, summary, rows };
 }
 
+async function queryExport(input: EditionQueryFilter): Promise<{ rows: EditionQueryRow[] }> {
+  const db = await getDb();
+  if (!editionsTableExists(db)) return { rows: [] };
+
+  const { whereSql, bind } = buildEditionQueryWhere(input);
+  const rows: EditionQueryRow[] = [];
+  db.exec({
+    sql: `${ROW_SELECT}
+      ${whereSql}
+      ORDER BY data_edicao DESC, numero_edicao DESC, egbanet_id DESC`,
+    bind,
+    rowMode: 'array',
+    callback: (row: unknown[]) => rows.push(mapEditionRow(row))
+  });
+  return { rows };
+}
+
 async function handle(action: string, payload: any): Promise<unknown> {
   if (action === 'queryOptions') return queryOptions();
   if (action === 'queryEditions') return queryEditions(payload.filter ?? {});
+  if (action === 'queryExport') return queryExport(payload.filter ?? {});
   throw new Error(`Ação de consulta desconhecida: ${action}`);
 }
 

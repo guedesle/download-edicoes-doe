@@ -1,4 +1,5 @@
 export const SQLITE_IMPORT_SCHEMA_VERSION = 6;
+export const SQLITE_IMPORT_SUPPORTED_SOURCE_VERSIONS = [5, 6] as const;
 export const SQLITE_IMPORT_MAX_BYTES = 512 * 1024 * 1024;
 
 const SQLITE_HEADER = 'SQLite format 3\u0000';
@@ -19,4 +20,10 @@ export function assertSqliteHeader(bytes: Uint8Array): void {
   if (bytes.byteLength < 100) throw new Error('Arquivo muito pequeno para ser um banco SQLite válido.');
   const header = new TextDecoder('ascii').decode(bytes.subarray(0, SQLITE_HEADER.length));
   if (header !== SQLITE_HEADER) throw new Error('O arquivo selecionado não possui um cabeçalho SQLite válido.');
+}
+
+export function isSupportedSqliteImportSchemaVersion(version: number): boolean {
+  return SQLITE_IMPORT_SUPPORTED_SOURCE_VERSIONS.includes(
+    version as (typeof SQLITE_IMPORT_SUPPORTED_SOURCE_VERSIONS)[number]
+  );
 }

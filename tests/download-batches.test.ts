@@ -25,6 +25,7 @@ describe('planejamento de lotes', () => {
     })).toEqual({
       criterion: 'period',
       fileType: 'normal',
+      editionScope: 'all',
       startDate: '2022-01-30',
       endDate: '2022-07-31',
       name: 'Lote histórico'
@@ -36,6 +37,37 @@ describe('planejamento de lotes', () => {
       startDate: '2022-08-01',
       endDate: '2022-07-31'
     })).toThrow('data inicial');
+  });
+
+  it('usa regulares + suplementos como padrão e aceita os escopos específicos', () => {
+    expect(normalizeDownloadBatchFilter({
+      criterion: 'egbanet_ids',
+      fileType: 'both',
+      egbanetIds: [22178]
+    }).editionScope).toBe('all');
+
+    expect(normalizeDownloadBatchFilter({
+      criterion: 'egbanet_ids',
+      fileType: 'both',
+      editionScope: 'regular',
+      egbanetIds: [22178]
+    }).editionScope).toBe('regular');
+
+    expect(normalizeDownloadBatchFilter({
+      criterion: 'egbanet_ids',
+      fileType: 'both',
+      editionScope: 'supplements',
+      egbanetIds: [22180]
+    }).editionScope).toBe('supplements');
+  });
+
+  it('rejeita tipo de edição inválido', () => {
+    expect(() => normalizeDownloadBatchFilter({
+      criterion: 'egbanet_ids',
+      fileType: 'normal',
+      editionScope: 'outro' as never,
+      egbanetIds: [22178]
+    })).toThrow('Tipo de edição inválido');
   });
 
   it('expande ambos para normal e assinado', () => {

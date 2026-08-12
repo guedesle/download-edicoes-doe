@@ -27,6 +27,16 @@ function yesNo(value: string): boolean | null {
   return null;
 }
 
+function supplementFlag(value: string): boolean | null {
+  const normalized = normalize(value);
+  if (!normalized) return null;
+  if (normalized === 'nao' || normalized === '0' || normalized === 'false') return false;
+  if (normalized === 'sim' || normalized === '1' || normalized === 'true') return true;
+  if (normalized.includes('suplement')) return true;
+  if (/^\d+\s*[ºªo]?$/u.test(normalized)) return Number.parseInt(normalized, 10) > 0;
+  return null;
+}
+
 export function parseBrDate(value: string): string {
   const match = value.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (!match) throw new Error(`Data de edição inválida: ${value}`);
@@ -83,7 +93,7 @@ function parseRow(row: Element, headers: Map<string, number>, pageNumber: number
     tipoEdicao: text(cell(cells, headers, 'Tipo de Edição')),
     dataEdicao: parseBrDate(text(cell(cells, headers, 'Data Edição'))),
     numeroEdicao: requiredInteger(text(cell(cells, headers, 'Número')), 'Número da edição'),
-    suplemento: yesNo(text(cell(cells, headers, 'Suplemento'))),
+    suplemento: supplementFlag(text(cell(cells, headers, 'Suplemento'))),
     numeroPaginas: integer(text(cell(cells, headers, 'Num. Pags.'))),
     materias: integer(text(cell(cells, headers, 'Matérias'))),
     materiasPendentes: integer(text(cell(cells, headers, 'Matérias Pendentes'))),

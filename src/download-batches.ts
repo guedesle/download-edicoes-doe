@@ -89,9 +89,9 @@ export function buildDownloadItemPath(
 
   const year = dataEdicao.slice(0, 4);
   const month = dataEdicao.slice(5, 7);
-  const typeLabel = type === 'normal' ? 'NORMAL' : 'ASSINADO';
   const typeFolder = type === 'normal' ? 'normal' : 'assinado';
   const supplementLabel = supplementNumber === null ? '' : `-SUP-${supplementNumber}`;
-  const filename = `${dataEdicao}-${numeroEdicao}${supplementLabel}-${typeLabel}.pdf`;
+  const signedLabel = type === 'signed' ? '-ASSINADO' : '';
+  const filename = `${dataEdicao}-${numeroEdicao}${supplementLabel}${signedLabel}.pdf`;
   return { filename, relativePath: `${year}/${month}/${typeFolder}/${filename}` };
 }

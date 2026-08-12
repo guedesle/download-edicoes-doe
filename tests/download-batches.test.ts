@@ -54,4 +54,20 @@ describe('planejamento de lotes', () => {
       relativePath: '2022/07/assinado/2022-07-31-12345-ASSINADO.pdf'
     });
   });
+
+  it('acrescenta SUP-X depois do número da edição', () => {
+    expect(buildDownloadItemPath('2026-07-08', 24429, 22180, 'normal', 1)).toEqual({
+      filename: '2026-07-08-24429-SUP-1-NORMAL.pdf',
+      relativePath: '2026/07/normal/2026-07-08-24429-SUP-1-NORMAL.pdf'
+    });
+
+    expect(buildDownloadItemPath('2026-07-08', 24429, 22181, 'signed', 2)).toEqual({
+      filename: '2026-07-08-24429-SUP-2-ASSINADO.pdf',
+      relativePath: '2026/07/assinado/2026-07-08-24429-SUP-2-ASSINADO.pdf'
+    });
+  });
+
+  it('rejeita número de suplemento inválido', () => {
+    expect(() => buildDownloadItemPath('2026-07-08', 24429, 22180, 'normal', 0)).toThrow('Número do suplemento inválido');
+  });
 });

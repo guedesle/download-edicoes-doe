@@ -35,7 +35,7 @@ describe('exportação da consulta', () => {
     expect(text).toContain('Data;Número da edição;ID EGBANET');
     expect(text).toContain('https://egbanet.egba.ba.gov.br/admin/edicoes/download_versao/22180_1/0');
     expect(text).toContain('"Tipo; com ""aspas"""');
-    expect(text).toContain(';357?').toBe(false);
+    expect(text.includes(';357?')).toBe(false);
   });
 
   it('gera um pacote XLSX/ZIP válido em modo store com todas as linhas', () => {

@@ -1,3 +1,5 @@
+import './download-execution.css';
+
 const BATCH_DOWNLOAD_STATUS_KEY = 'batchDownloadStatus';
 
 type ExecutionState = 'idle' | 'running' | 'completed' | 'cancelled' | 'error';

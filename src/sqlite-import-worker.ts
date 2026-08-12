@@ -149,10 +149,14 @@ function prepareSource(source: any): { sourceVersion: number; migrated: boolean 
 
   if (sourceVersion === 5) {
     assertTables(source, V5_TABLES);
-    source.transaction(() => {
-      source.exec(V6_DOWNLOAD_SCHEMA);
-      source.exec(`PRAGMA user_version=${SQLITE_IMPORT_SCHEMA_VERSION};`);
-    });
+    // A origem é uma cópia SQLite desserializada e descartável em memória.
+    // Não envolvemos a migração em DB.transaction(): em sqlite-wasm 3.53,
+    // a combinação de DDL nessa conexão temporária pode mascarar a causa
+    // original com "cannot rollback - no transaction is active". Se qualquer
+    // etapa falhar, a cópia é simplesmente fechada e o arquivo original não
+    // é alterado.
+    source.exec(V6_DOWNLOAD_SCHEMA);
+    source.exec(`PRAGMA user_version=${SQLITE_IMPORT_SCHEMA_VERSION};`);
   }
 
   assertTables(source, TABLES);

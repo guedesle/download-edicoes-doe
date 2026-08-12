@@ -63,6 +63,64 @@ function picker(): ((options?: { mode?: 'read' | 'readwrite'; id?: string }) => 
   return typeof candidate === 'function' ? candidate.bind(window) : null;
 }
 
+function installStyles(): void {
+  if (document.querySelector('#destinationUiStyles')) return;
+  const style = document.createElement('style');
+  style.id = 'destinationUiStyles';
+  style.textContent = `
+    .destination-selector {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      padding: 11px;
+      border: 1px solid #d8dee7;
+      border-radius: 10px;
+      background: #f8fafc;
+    }
+    .destination-selector[data-state="ready"] {
+      border-color: #bfdfc9;
+      background: #f4fbf6;
+    }
+    .destination-copy {
+      display: grid;
+      min-width: 0;
+      gap: 3px;
+    }
+    .destination-label {
+      color: #475467;
+      font-size: 10px;
+      font-weight: 650;
+    }
+    .destination-copy strong {
+      overflow: hidden;
+      color: #172033;
+      font-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .destination-copy small {
+      color: #667085;
+      font-size: 9.5px;
+      line-height: 1.35;
+    }
+    .destination-button {
+      min-height: 35px;
+      padding: 0 11px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    @media (max-width: 430px) {
+      .destination-selector { grid-template-columns: 1fr; }
+      .destination-button { width: 100%; }
+    }
+  `;
+  document.head.append(style);
+}
+
 function mountDestinationUi(): void {
   const batchForm = document.querySelector<HTMLElement>('.batch-form');
   const createButton = document.querySelector<HTMLButtonElement>('#createBatchButton');
@@ -70,8 +128,11 @@ function mountDestinationUi(): void {
   const successBox = document.querySelector<HTMLElement>('#batchSuccessBox');
   if (!batchForm || !createButton || !errorBox || !successBox) return;
 
+  installStyles();
+
   const wrapper = document.createElement('section');
   wrapper.className = 'destination-selector';
+  wrapper.dataset.state = 'pending';
   wrapper.innerHTML = `
     <div class="destination-copy">
       <span class="destination-label">Pasta de destino</span>

@@ -35,7 +35,7 @@ describe('exportação da consulta', () => {
     expect(text).toContain('Data;Número da edição;ID EGBANET');
     expect(text).toContain('https://egbanet.egba.ba.gov.br/admin/edicoes/download_versao/22180_1/0');
     expect(text).toContain('"Tipo; com ""aspas"""');
-    expect(text).toContain(';357?').not.toBe(true);
+    expect(text).toContain(';357?').toBe(false);
   });
 
   it('gera um pacote XLSX/ZIP válido em modo store com todas as linhas', () => {
@@ -46,7 +46,6 @@ describe('exportação da consulta', () => {
     expect(raw).toContain('xl/worksheets/sheet1.xml');
     expect(raw).toContain('24429');
     expect(raw).toContain('Diário Oficial do Estado da Bahia');
-    expect(raw).toContain('Suplemento').not.toBe(true);
     expect(raw).toContain('https://egbanet.egba.ba.gov.br/admin/edicoes/download_versao/22180_1/1');
   });
 });

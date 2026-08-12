@@ -43,15 +43,15 @@ describe('planejamento de lotes', () => {
     expect(requestedItemTypes('normal')).toEqual(['normal']);
   });
 
-  it('gera nome AAAA-MM-DD-NUM_EDICAO e separa o tipo em subpasta', () => {
+  it('gera nome com NORMAL ou ASSINADO e separa por subpasta', () => {
     expect(buildDownloadItemPath('2022-07-31', 12345, 21535, 'normal')).toEqual({
-      filename: '2022-07-31-12345.pdf',
-      relativePath: '2022/07/normal/2022-07-31-12345.pdf'
+      filename: '2022-07-31-12345-NORMAL.pdf',
+      relativePath: '2022/07/normal/2022-07-31-12345-NORMAL.pdf'
     });
 
     expect(buildDownloadItemPath('2022-07-31', 12345, 21535, 'signed')).toEqual({
-      filename: '2022-07-31-12345.pdf',
-      relativePath: '2022/07/signed/2022-07-31-12345.pdf'
+      filename: '2022-07-31-12345-ASSINADO.pdf',
+      relativePath: '2022/07/assinado/2022-07-31-12345-ASSINADO.pdf'
     });
   });
 });

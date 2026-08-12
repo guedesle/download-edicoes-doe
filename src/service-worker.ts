@@ -3,6 +3,12 @@ const INVENTORY_STATUS_KEY = 'inventorySyncStatus';
 const DOWNLOAD_STATUS_KEY = 'downloadCaptureStatus';
 const BATCH_DOWNLOAD_STATUS_KEY = 'batchDownloadStatus';
 
+function storedState(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const state = (value as { state?: unknown }).state;
+  return typeof state === 'string' ? state : undefined;
+}
+
 async function configureSidePanel(): Promise<void> {
   await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 }
@@ -29,14 +35,14 @@ async function persistStatus(key: string, status: unknown): Promise<void> {
 
 async function isBatchDownloadRunning(): Promise<boolean> {
   const result = await chrome.storage.local.get(BATCH_DOWNLOAD_STATUS_KEY);
-  return result[BATCH_DOWNLOAD_STATUS_KEY]?.state === 'running';
+  return storedState(result[BATCH_DOWNLOAD_STATUS_KEY]) === 'running';
 }
 
 async function anotherOperationIsRunning(): Promise<boolean> {
   const result = await chrome.storage.local.get([INVENTORY_STATUS_KEY, DOWNLOAD_STATUS_KEY, BATCH_DOWNLOAD_STATUS_KEY]);
-  return result[INVENTORY_STATUS_KEY]?.state === 'running'
-    || result[DOWNLOAD_STATUS_KEY]?.state === 'running'
-    || result[BATCH_DOWNLOAD_STATUS_KEY]?.state === 'running';
+  return storedState(result[INVENTORY_STATUS_KEY]) === 'running'
+    || storedState(result[DOWNLOAD_STATUS_KEY]) === 'running'
+    || storedState(result[BATCH_DOWNLOAD_STATUS_KEY]) === 'running';
 }
 
 async function exportSqlite(): Promise<{ ok: boolean; downloadId?: number; bytes?: number; reason?: string }> {

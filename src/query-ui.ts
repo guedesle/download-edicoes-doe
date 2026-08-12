@@ -279,7 +279,9 @@ function exportFilename(extension: 'csv' | 'xlsx'): string {
 }
 
 async function downloadBytes(bytes: Uint8Array, mimeType: string, filename: string): Promise<void> {
-  const blob = new Blob([bytes], { type: mimeType });
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  const blob = new Blob([buffer], { type: mimeType });
   const url = URL.createObjectURL(blob);
   try {
     await new Promise<void>((resolve, reject) => {

@@ -1,3 +1,5 @@
+import './query.css';
+
 function mountQueryUi(): void {
   const tabs = document.querySelector<HTMLElement>('.tabs');
   const main = document.querySelector<HTMLElement>('.app-shell');

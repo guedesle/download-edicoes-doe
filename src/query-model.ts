@@ -1,5 +1,5 @@
 export type EditionQueryAvailability = 'any' | 'normal' | 'signed' | 'both' | 'some' | 'none';
-export type EditionQuerySupplement = 'any' | 'yes' | 'no' | 'unknown';
+export type EditionQuerySupplement = 'any' | 'yes' | 'no';
 
 export interface EditionQueryFilter {
   startDate?: string;
@@ -60,7 +60,7 @@ export function normalizeEditionQueryFilter(input: EditionQueryFilter): Normaliz
   }
 
   const supplement = input.supplement ?? 'any';
-  if (!['any', 'yes', 'no', 'unknown'].includes(supplement)) {
+  if (!['any', 'yes', 'no'].includes(supplement)) {
     throw new Error('Filtro de suplemento inválido.');
   }
 
@@ -118,9 +118,10 @@ export function buildEditionQueryWhere(input: EditionQueryFilter): EditionQueryW
     bind.push(filter.editionType);
   }
 
-  if (filter.supplement === 'yes') conditions.push('suplemento = 1');
+  // Compatibilidade com o inventário já coletado: versões antigas do parser
+  // gravaram suplementos como NULL. Novas sincronizações passam a gravá-los como 1.
+  if (filter.supplement === 'yes') conditions.push('(suplemento = 1 OR suplemento IS NULL)');
   else if (filter.supplement === 'no') conditions.push('suplemento = 0');
-  else if (filter.supplement === 'unknown') conditions.push('suplemento IS NULL');
 
   if (filter.availability === 'normal') {
     conditions.push('download_diario_url IS NOT NULL');

@@ -87,6 +87,7 @@ function mountDestinationUi(): void {
   const destinationHint = wrapper.querySelector<HTMLElement>('#batchDestinationHint')!;
 
   let selectedDirectory: DirectoryHandleWithPermission | null = null;
+  const associatedBatches = new Set<number>();
 
   function renderReady(handle: DirectoryHandleWithPermission): void {
     selectedDirectory = handle;
@@ -152,7 +153,8 @@ function mountDestinationUi(): void {
     const match = successBox.textContent?.match(/Lote #(\d+) criado/);
     if (!match) return;
     const batchId = Number(match[1]);
-    if (!Number.isSafeInteger(batchId) || batchId <= 0) return;
+    if (!Number.isSafeInteger(batchId) || batchId <= 0 || associatedBatches.has(batchId)) return;
+    associatedBatches.add(batchId);
 
     const handle = selectedDirectory;
     void storeHandle(`batch:${batchId}`, handle)
@@ -163,6 +165,7 @@ function mountDestinationUi(): void {
         }
       })
       .catch((error) => {
+        associatedBatches.delete(batchId);
         errorBox.hidden = false;
         errorBox.textContent = `O lote #${batchId} foi criado, mas não foi possível associar a pasta de destino: ${error instanceof Error ? error.message : String(error)}`;
       });

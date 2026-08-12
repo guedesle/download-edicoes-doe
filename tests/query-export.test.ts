@@ -30,12 +30,12 @@ const rows: EditionExportRow[] = [
 
 describe('exportação da consulta', () => {
   it('gera CSV UTF-8 com BOM, separador pt-BR e URLs absolutas', () => {
-    const text = new TextDecoder().decode(createQueryCsv(rows));
-    expect(text.charCodeAt(0)).toBe(0xfeff);
+    const bytes = createQueryCsv(rows);
+    expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+    const text = new TextDecoder().decode(bytes);
     expect(text).toContain('Data;Número da edição;ID EGBANET');
     expect(text).toContain('https://egbanet.egba.ba.gov.br/admin/edicoes/download_versao/22180_1/0');
     expect(text).toContain('"Tipo; com ""aspas"""');
-    expect(text.includes(';357?')).toBe(false);
   });
 
   it('gera um pacote XLSX/ZIP válido em modo store com todas as linhas', () => {

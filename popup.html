@@ -141,6 +141,16 @@
             <small>Separe IDs por vírgula, espaço ou nova linha. Máximo de 500.</small>
           </label>
 
+          <label class="form-field">
+            <span>Tipo de edição</span>
+            <select id="batchEditionScopeSelect">
+              <option value="all" selected>Regulares + suplementos (padrão)</option>
+              <option value="regular">Somente edições regulares</option>
+              <option value="supplements">Somente suplementos</option>
+            </select>
+            <small>Suplementos legados com valor vazio também entram em “Somente suplementos”.</small>
+          </label>
+
           <div class="form-grid form-grid--two">
             <label class="form-field">
               <span>Arquivos</span>

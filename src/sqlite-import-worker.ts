@@ -161,10 +161,9 @@ async function importDatabase(bytes: Uint8Array): Promise<{
       target.exec(`PRAGMA user_version=${SQLITE_IMPORT_SCHEMA_VERSION};`);
       const violations = countForeignKeyViolations(target);
       if (violations > 0) throw new Error(`A importação produziria ${violations} violação(ões) de chave estrangeira.`);
+      const integrity = String(target.selectValue('PRAGMA integrity_check'));
+      if (integrity !== 'ok') throw new Error(`A importação produziria um banco inconsistente: ${integrity}`);
     });
-
-    const integrity = String(target.selectValue('PRAGMA integrity_check'));
-    if (integrity !== 'ok') throw new Error(`Banco local falhou no integrity_check após a importação: ${integrity}`);
 
     return {
       bytes: bytes.byteLength,

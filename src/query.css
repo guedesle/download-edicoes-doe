@@ -1,0 +1,31 @@
+.tabs--four { grid-template-columns: repeat(4, 1fr); }
+
+.query-form { margin-bottom: 12px; }
+.query-actions { margin-top: 0; }
+.query-summary { margin: 12px 0; }
+.query-summary .summary-card strong { font-size: 18px; }
+
+.query-results { overflow: hidden; border: 1px solid #e1e6ed; border-radius: 12px; background: #fff; }
+.query-results-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 13px; border-bottom: 1px solid #e8edf2; }
+.query-results-header strong { display: block; color: #344054; font-size: 13px; }
+.query-table-wrap { overflow-x: auto; }
+.query-table { width: 100%; min-width: 660px; border-collapse: collapse; font-size: 10.5px; }
+.query-table th,
+.query-table td { padding: 9px 8px; border-bottom: 1px solid #edf1f5; text-align: left; vertical-align: top; }
+.query-table th { position: sticky; top: 0; background: #f8fafc; color: #667085; font-size: 9.5px; font-weight: 750; white-space: nowrap; }
+.query-table td { color: #344054; }
+.query-table td strong { display: block; font-size: 11px; }
+.query-table td small { display: block; margin-top: 2px; color: #98a2b3; font-size: 9px; }
+.query-table tr:last-child td { border-bottom: 0; }
+.query-empty { padding: 22px !important; color: #667085 !important; text-align: center !important; }
+.query-file-link { color: #245b91; font-weight: 700; text-decoration: none; }
+.query-file-link:hover { text-decoration: underline; }
+.query-link-missing { color: #98a2b3; }
+.query-mini-badge { display: inline-block; margin-top: 4px; border-radius: 999px; padding: 2px 5px; background: #eef2f6; color: #667085; font-size: 8.5px; font-weight: 700; }
+.query-pagination { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid #e8edf2; }
+.query-pagination button { min-height: 32px; border-radius: 8px; padding: 0 11px; cursor: pointer; font-size: 11px; font-weight: 700; }
+
+@media (max-width: 470px) {
+  .tabs--four .tab-button { font-size: 11px; }
+  .query-results-header { align-items: flex-start; flex-direction: column; }
+}

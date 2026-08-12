@@ -38,7 +38,15 @@ if (-not (Test-Path $offscreenJs)) {
   throw 'dist\offscreen.js não encontrado.'
 }
 $offscreenText = Get-Content $offscreenJs -Raw
-if ($offscreenText -match 'chrome\.storage') {
+$storageMatch = [regex]::Match($offscreenText, 'chrome\.storage')
+if ($storageMatch.Success) {
+  $start = [Math]::Max(0, $storageMatch.Index - 220)
+  $length = [Math]::Min(520, $offscreenText.Length - $start)
+  $snippet = $offscreenText.Substring($start, $length)
+  Write-Host ''
+  Write-Host 'Trecho encontrado em dist\offscreen.js:' -ForegroundColor Yellow
+  Write-Host $snippet
+  Write-Host ''
   throw 'Build rejeitada: dist\offscreen.js contém referência a chrome.storage. Corrija antes de implantar.'
 }
 

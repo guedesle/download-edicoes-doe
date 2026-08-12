@@ -75,10 +75,10 @@ describe('planejamento de lotes', () => {
     expect(requestedItemTypes('normal')).toEqual(['normal']);
   });
 
-  it('gera nome com NORMAL ou ASSINADO e separa por subpasta', () => {
+  it('omite NORMAL do arquivo regular e preserva ASSINADO', () => {
     expect(buildDownloadItemPath('2022-07-31', 12345, 21535, 'normal')).toEqual({
-      filename: '2022-07-31-12345-NORMAL.pdf',
-      relativePath: '2022/07/normal/2022-07-31-12345-NORMAL.pdf'
+      filename: '2022-07-31-12345.pdf',
+      relativePath: '2022/07/normal/2022-07-31-12345.pdf'
     });
 
     expect(buildDownloadItemPath('2022-07-31', 12345, 21535, 'signed')).toEqual({
@@ -87,10 +87,10 @@ describe('planejamento de lotes', () => {
     });
   });
 
-  it('acrescenta SUP-X depois do número da edição', () => {
+  it('acrescenta SUP-X e omite NORMAL nos suplementos não assinados', () => {
     expect(buildDownloadItemPath('2026-07-08', 24429, 22180, 'normal', 1)).toEqual({
-      filename: '2026-07-08-24429-SUP-1-NORMAL.pdf',
-      relativePath: '2026/07/normal/2026-07-08-24429-SUP-1-NORMAL.pdf'
+      filename: '2026-07-08-24429-SUP-1.pdf',
+      relativePath: '2026/07/normal/2026-07-08-24429-SUP-1.pdf'
     });
 
     expect(buildDownloadItemPath('2026-07-08', 24429, 22181, 'signed', 2)).toEqual({

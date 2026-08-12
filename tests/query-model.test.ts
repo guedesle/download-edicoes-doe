@@ -45,6 +45,11 @@ describe('consulta de edições', () => {
     expect(result.filter.pageSize).toBe(50);
   });
 
+  it('trata NULL legado como suplemento', () => {
+    const result = buildEditionQueryWhere({ supplement: 'yes' });
+    expect(result.whereSql).toContain('(suplemento = 1 OR suplemento IS NULL)');
+  });
+
   it('filtra edições sem nenhum arquivo', () => {
     const result = buildEditionQueryWhere({ availability: 'none' });
     expect(result.whereSql).toContain('download_diario_url IS NULL AND download_assinado_url IS NULL');

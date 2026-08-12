@@ -79,6 +79,6 @@ export function buildDownloadItemPath(
 
   const year = dataEdicao.slice(0, 4);
   const month = dataEdicao.slice(5, 7);
-  const filename = `${dataEdicao}_edicao-${numeroEdicao}_id-${egbanetId}_${type}.pdf`;
-  return { filename, relativePath: `${year}/${month}/${filename}` };
+  const filename = `${dataEdicao}-${numeroEdicao}.pdf`;
+  return { filename, relativePath: `${year}/${month}/${type}/${filename}` };
 }

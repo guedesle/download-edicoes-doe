@@ -41,11 +41,19 @@ async function getDb(): Promise<any> {
   return dbPromise;
 }
 
+function scalar(db: any, sql: string, bind: unknown[] = []): unknown {
+  let value: unknown = null;
+  db.exec({
+    sql,
+    bind,
+    rowMode: 'array',
+    callback: (row: unknown[]) => { value = row[0]; }
+  });
+  return value;
+}
+
 function batchExists(db: any, batchId: number): boolean {
-  return Number(db.selectValue({
-    sql: 'SELECT COUNT(*) FROM download_lotes WHERE id=?',
-    bind: [batchId]
-  })) > 0;
+  return Number(scalar(db, 'SELECT COUNT(*) FROM download_lotes WHERE id=?', [batchId])) > 0;
 }
 
 function refreshBatchCounters(db: any, batchId: number): void {

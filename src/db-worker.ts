@@ -136,6 +136,7 @@ interface BatchEditionRow {
   normalBytes: number | null;
   signedUrl: string | null;
   signedBytes: number | null;
+  supplementNumber: number | null;
 }
 
 function editionsTableExists(db: any): boolean {
@@ -422,24 +423,35 @@ function queryBatchEditions(db: any, input: DownloadBatchFilter): { filter: Down
   const filter = normalizeDownloadBatchFilter(input);
   const rows: BatchEditionRow[] = [];
   let sql = `
-    SELECT egbanet_id, data_edicao, numero_edicao, numero_paginas,
-           download_diario_url, download_diario_bytes,
-           download_assinado_url, download_assinado_bytes
-    FROM edicoes
+    SELECT e.egbanet_id, e.data_edicao, e.numero_edicao, e.numero_paginas,
+           e.download_diario_url, e.download_diario_bytes,
+           e.download_assinado_url, e.download_assinado_bytes,
+           CASE
+             WHEN e.suplemento = 0 THEN NULL
+             ELSE (
+               SELECT COUNT(*)
+               FROM edicoes AS s
+               WHERE s.data_edicao = e.data_edicao
+                 AND s.numero_edicao = e.numero_edicao
+                 AND (s.suplemento IS NULL OR s.suplemento <> 0)
+                 AND s.egbanet_id <= e.egbanet_id
+             )
+           END AS suplemento_numero
+    FROM edicoes AS e
   `;
   let bind: unknown[] = [];
 
   if (filter.criterion === 'period') {
-    sql += ' WHERE data_edicao BETWEEN ? AND ?';
+    sql += ' WHERE e.data_edicao BETWEEN ? AND ?';
     bind = [filter.startDate, filter.endDate];
   } else {
     const ids = filter.egbanetIds ?? [];
     const placeholders = ids.map(() => '?').join(',');
-    sql += ` WHERE egbanet_id IN (${placeholders})`;
+    sql += ` WHERE e.egbanet_id IN (${placeholders})`;
     bind = ids;
   }
 
-  sql += ' ORDER BY data_edicao ASC, egbanet_id ASC';
+  sql += ' ORDER BY e.data_edicao ASC, e.egbanet_id ASC';
   db.exec({
     sql,
     bind,
@@ -452,7 +464,8 @@ function queryBatchEditions(db: any, input: DownloadBatchFilter): { filter: Down
       normalUrl: row[4] === null ? null : String(row[4]),
       normalBytes: row[5] === null ? null : Number(row[5]),
       signedUrl: row[6] === null ? null : String(row[6]),
-      signedBytes: row[7] === null ? null : Number(row[7])
+      signedBytes: row[7] === null ? null : Number(row[7]),
+      supplementNumber: row[8] === null ? null : Number(row[8])
     })
   });
 
@@ -563,7 +576,13 @@ async function createDownloadBatch(input: DownloadBatchFilter): Promise<Download
       for (const type of requestedItemTypes(filter.fileType)) {
         const source = itemSource(row, type);
         if (!source.url) continue;
-        const path = buildDownloadItemPath(row.dataEdicao, row.numeroEdicao, row.egbanetId, type);
+        const path = buildDownloadItemPath(
+          row.dataEdicao,
+          row.numeroEdicao,
+          row.egbanetId,
+          type,
+          row.supplementNumber
+        );
         db.exec({
           sql: insertItemSql,
           bind: [

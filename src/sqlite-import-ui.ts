@@ -36,8 +36,17 @@ async function importSelected(file: File): Promise<void> {
     if (!response?.ok || !response.result) {
       throw new Error(response?.reason ?? 'Não foi possível importar o SQLite.');
     }
-    const result = response.result as { editions: number; capturedEditions: number; batches: number };
-    importStatus.textContent = `Importação concluída: ${result.editions.toLocaleString('pt-BR')} edições, ${result.capturedEditions.toLocaleString('pt-BR')} com links capturados e ${result.batches.toLocaleString('pt-BR')} lote(s). Atualizando o painel…`;
+    const result = response.result as {
+      editions: number;
+      capturedEditions: number;
+      batches: number;
+      sourceVersion?: number;
+      migrated?: boolean;
+    };
+    const migration = result.migrated && result.sourceVersion === 5
+      ? ' Schema v5 migrado para v6 durante a importação.'
+      : '';
+    importStatus.textContent = `Importação concluída: ${result.editions.toLocaleString('pt-BR')} edições, ${result.capturedEditions.toLocaleString('pt-BR')} com links capturados e ${result.batches.toLocaleString('pt-BR')} lote(s).${migration} Atualizando o painel…`;
     window.setTimeout(() => window.location.reload(), 700);
   } finally {
     URL.revokeObjectURL(blobUrl);

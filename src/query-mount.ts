@@ -117,7 +117,11 @@ function mountQueryUi(): void {
       </footer>
     </section>
 
-    <p class="helper-text">A consulta usa 25 registros por página. Exportação CSV e Excel entra no próximo incremento da Fase 8.2.</p>
+    <section class="actions actions--wrap" aria-label="Exportação do resultado atual">
+      <button id="queryExportCsvButton" class="secondary-button" type="button" disabled>Exportar CSV</button>
+      <button id="queryExportXlsxButton" class="secondary-button" type="button" disabled>Exportar Excel</button>
+    </section>
+    <p id="queryExportStatus" class="helper-text">Consulte primeiro. A exportação inclui todas as linhas do filtro atual, não apenas a página visível.</p>
   `;
   main.append(panel);
 }

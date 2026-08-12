@@ -1,4 +1,5 @@
 import './query-mount';
+import './analytics-mount';
 
 const manifest = chrome.runtime.getManifest();
 const displayVersion = manifest.version_name || manifest.version;

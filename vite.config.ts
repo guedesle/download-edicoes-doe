@@ -14,6 +14,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         popup: resolve(root, 'popup.html'),
+        analytics: resolve(root, 'analytics.html'),
         offscreen: resolve(root, 'offscreen.html'),
         'service-worker': resolve(root, 'src/service-worker.ts')
       },

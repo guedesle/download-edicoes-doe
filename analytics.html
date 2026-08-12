@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Analytics DOE</title>
+  </head>
+  <body>
+    <main class="analytics-page-shell">
+      <header class="analytics-page-header">
+        <div>
+          <span class="eyebrow">EGBANET · SQLite local</span>
+          <h1>Analytics do acervo DOE</h1>
+          <p>Dashboard local. Nenhuma conexão com o EGBANET é necessária para consultar os dados já importados.</p>
+        </div>
+        <div class="header-badges">
+          <span class="status-pill status-pill--offline">Offline / local</span>
+          <span id="analyticsPageVersion" class="status-pill">v—</span>
+        </div>
+      </header>
+
+      <section class="panel filter-panel">
+        <form id="analyticsPageForm" class="filter-form">
+          <label><span>Data inicial</span><input id="analyticsPageStartDate" type="date" /></label>
+          <label><span>Data final</span><input id="analyticsPageEndDate" type="date" /></label>
+          <label><span>Tipo de edição</span><select id="analyticsPageEditionType"><option value="">Todos</option></select></label>
+          <label><span>Suplemento</span><select id="analyticsPageSupplement"><option value="any">Todos</option><option value="yes">Somente suplementos</option><option value="no">Sem suplemento</option></select></label>
+          <label><span>Arquivos</span><select id="analyticsPageAvailability"><option value="any">Qualquer disponibilidade</option><option value="normal">Normal disponível</option><option value="signed">Assinado disponível</option><option value="both">Normal + assinado</option><option value="some">Algum arquivo disponível</option><option value="none">Sem arquivos</option></select></label>
+          <label><span>Granularidade temporal</span><select id="analyticsPageGranularity"><option value="month">Mensal</option><option value="year">Anual</option></select></label>
+          <div class="filter-actions"><button id="analyticsPageClear" type="button" class="secondary-button">Limpar</button><button id="analyticsPageSubmit" type="submit" class="primary-button">Atualizar</button></div>
+        </form>
+        <p id="analyticsPageFilters" class="active-filters">Filtros ativos: todo o acervo.</p>
+        <p id="analyticsPageError" class="error-box" hidden></p>
+      </section>
+
+      <section class="kpi-grid" aria-label="Indicadores fundamentais">
+        <article><span>Edições</span><strong id="analyticsPageEditions">0</strong></article>
+        <article><span>Páginas</span><strong id="analyticsPagePages">0</strong></article>
+        <article><span>Arquivos disponíveis</span><strong id="analyticsPageFiles">0</strong></article>
+        <article><span>Volume conhecido</span><strong id="analyticsPageBytes">0 MB</strong></article>
+      </section>
+
+      <section class="chart-grid">
+        <article class="panel chart-card chart-card--wide">
+          <header><div><span class="section-kicker">Série temporal</span><h2>Páginas por período + regressão linear</h2></div><span id="analyticsRegressionSummary" class="chart-note"></span></header>
+          <div id="analyticsPagesTrend" class="chart-host"></div>
+          <p class="chart-footnote">A regressão mostra tendência descritiva no período filtrado; não é uma projeção futura.</p>
+        </article>
+
+        <article class="panel chart-card chart-card--wide">
+          <header><div><span class="section-kicker">Composição temporal</span><h2>Tipos de edição ao longo do tempo</h2></div></header>
+          <div id="analyticsTypesTemporal" class="chart-host"></div>
+          <p class="chart-footnote">São exibidos os cinco tipos com maior número de edições dentro do filtro atual.</p>
+        </article>
+
+        <article class="panel chart-card">
+          <header><div><span class="section-kicker">Barras</span><h2>Edições por tipo</h2></div></header>
+          <div id="analyticsTypesBars" class="chart-host"></div>
+        </article>
+
+        <article class="panel chart-card">
+          <header><div><span class="section-kicker">Distribuição</span><h2>Páginas por edição</h2></div></header>
+          <div id="analyticsPagesDistribution" class="chart-host"></div>
+        </article>
+
+        <article class="panel chart-card">
+          <header><div><span class="section-kicker">Distribuição</span><h2>Tamanho dos arquivos</h2></div></header>
+          <div id="analyticsSizesDistribution" class="chart-host"></div>
+        </article>
+
+        <article class="panel chart-card">
+          <header><div><span class="section-kicker">Boxplot</span><h2>Páginas por edição</h2></div></header>
+          <div id="analyticsPagesBoxplot" class="chart-host"></div>
+          <p id="analyticsPagesBoxplotNote" class="chart-footnote"></p>
+        </article>
+
+        <article class="panel chart-card">
+          <header><div><span class="section-kicker">Boxplot</span><h2>Tamanho dos arquivos</h2></div></header>
+          <div id="analyticsSizesBoxplot" class="chart-host"></div>
+          <p id="analyticsSizesBoxplotNote" class="chart-footnote"></p>
+        </article>
+
+        <article class="panel chart-card chart-card--wide">
+          <header>
+            <div><span class="section-kicker">Distribuição estatística</span><h2>Histograma + curva normal de referência</h2></div>
+            <label class="inline-select"><span>Variável</span><select id="analyticsGaussianMetric"><option value="pages">Páginas</option><option value="sizes">Tamanho dos arquivos</option></select></label>
+          </header>
+          <div id="analyticsGaussianChart" class="chart-host"></div>
+          <p id="analyticsGaussianNote" class="chart-footnote"></p>
+        </article>
+      </section>
+
+      <section class="panel quality-panel">
+        <header><div><span class="section-kicker">Qualidade dos dados</span><h2>Pendências dentro do filtro atual</h2></div></header>
+        <div class="quality-grid">
+          <article><span>Sem páginas</span><strong id="analyticsPageMissingPages">0</strong></article>
+          <article><span>Sem link Normal</span><strong id="analyticsPageMissingNormal">0</strong></article>
+          <article><span>Sem link Assinado</span><strong id="analyticsPageMissingSigned">0</strong></article>
+          <article><span>Links sem tamanho</span><strong id="analyticsPageUnknownSizes">0</strong></article>
+        </div>
+      </section>
+
+      <footer class="analytics-page-footer">Fonte: <code>download-edicoes-doe.sqlite3</code> no OPFS do perfil atual. O dashboard é somente leitura.</footer>
+    </main>
+    <script type="module" src="/src/analytics-page.ts"></script>
+  </body>
+</html>

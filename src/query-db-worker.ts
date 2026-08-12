@@ -118,7 +118,9 @@ async function queryEditions(input: EditionQueryFilter): Promise<{
   db.exec({
     sql: `
       SELECT
-        egbanet_id, tipo_edicao, data_edicao, numero_edicao, suplemento, numero_paginas,
+        egbanet_id, tipo_edicao, data_edicao, numero_edicao,
+        CASE WHEN suplemento = 0 THEN 0 ELSE 1 END AS suplemento_efetivo,
+        numero_paginas,
         download_diario_url, download_diario_bytes,
         download_assinado_url, download_assinado_bytes
       FROM edicoes
@@ -133,7 +135,7 @@ async function queryEditions(input: EditionQueryFilter): Promise<{
       editionType: String(row[1]),
       date: String(row[2]),
       editionNumber: Number(row[3]),
-      supplement: row[4] === null ? null : Number(row[4]) === 1,
+      supplement: Number(row[4]) === 1,
       pages: row[5] === null ? null : Number(row[5]),
       normalUrl: row[6] === null ? null : String(row[6]),
       normalBytes: row[7] === null ? null : Number(row[7]),

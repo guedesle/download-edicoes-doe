@@ -79,6 +79,8 @@ export function buildDownloadItemPath(
 
   const year = dataEdicao.slice(0, 4);
   const month = dataEdicao.slice(5, 7);
-  const filename = `${dataEdicao}-${numeroEdicao}.pdf`;
-  return { filename, relativePath: `${year}/${month}/${type}/${filename}` };
+  const typeLabel = type === 'normal' ? 'NORMAL' : 'ASSINADO';
+  const typeFolder = type === 'normal' ? 'normal' : 'assinado';
+  const filename = `${dataEdicao}-${numeroEdicao}-${typeLabel}.pdf`;
+  return { filename, relativePath: `${year}/${month}/${typeFolder}/${filename}` };
 }

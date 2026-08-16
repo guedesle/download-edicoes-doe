@@ -5,7 +5,6 @@ on:
   schedule:
     - cron: "17 * * * *"
   push:
-    branches: [main]
     paths:
       - ".github/workflows/sync-central-skills.yml"
 

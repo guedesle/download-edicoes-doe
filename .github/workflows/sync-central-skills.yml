@@ -13,16 +13,17 @@ permissions:
   contents: write
 
 concurrency:
-  group: sync-central-skills-${{ github.ref }}
+  group: sync-central-skills-main
   cancel-in-progress: false
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout consumer repository
+      - name: Checkout current consumer main
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Fetch canonical skill from guedesle/SKILLS
@@ -53,4 +54,8 @@ jobs:
             exit 0
           fi
           git commit -m "chore(skills): sync write-technical-content from guedesle/SKILLS"
-          git push origin HEAD:main
+          if ! git push origin HEAD:main; then
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main
+          fi

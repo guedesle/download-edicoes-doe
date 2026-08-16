@@ -12,50 +12,8 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: sync-central-skills-main
-  cancel-in-progress: false
-
 jobs:
   sync:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout current consumer main
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-
-      - name: Fetch canonical skill from guedesle/SKILLS
-        shell: bash
-        run: |
-          set -euo pipefail
-          git clone --depth 1 https://github.com/guedesle/SKILLS.git .central-skills
-          test -f .central-skills/skills/write-technical-content/SKILL.md
-
-      - name: Mirror only the managed skill path
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf .agents/skills/write-technical-content
-          mkdir -p .agents/skills
-          cp -a .central-skills/skills/write-technical-content .agents/skills/write-technical-content
-          rm -rf .central-skills
-
-      - name: Commit mirror update when needed
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "skills-mirror-bot"
-          git config user.email "skills-mirror-bot@users.noreply.github.com"
-          git add -- .agents/skills/write-technical-content
-          if git diff --cached --quiet; then
-            echo "Mirror already synchronized."
-            exit 0
-          fi
-          git commit -m "chore(skills): sync write-technical-content from guedesle/SKILLS"
-          if ! git push origin HEAD:main; then
-            git fetch origin main
-            git rebase origin/main
-            git push origin HEAD:main
-          fi
+    uses: guedesle/SKILLS/.github/workflows/mirror-consumer.yml@main
+    permissions:
+      contents: write
